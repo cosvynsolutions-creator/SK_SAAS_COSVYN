@@ -142,9 +142,9 @@ const Login = () => {
 
         <div className="p-6 md:p-12 flex flex-col justify-center items-center relative w-full">
           
-          <Link to="/" className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-colors text-sm font-medium group">
+          <a href={import.meta.env.VITE_LANDING_URL} className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-colors text-sm font-medium group">
             <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Back
-          </Link>
+          </a>
 
           <div className="w-full max-w-sm mt-8 md:mt-0">
             <div className="text-center mb-6 md:mb-8">
