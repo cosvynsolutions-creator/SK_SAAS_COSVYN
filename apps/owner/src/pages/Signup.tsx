@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Zap, CheckCircle, ArrowRight, Loader2, Building, Mail, Lock, Phone, ArrowLeft, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/firebase';
@@ -9,6 +9,8 @@ import { checkFreeTrialEligibility } from '../services/dbService';
 const Signup = () => {
   const { signupWithEmail } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPlanId = new URLSearchParams(location.search).get('plan');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasPendingSubscription, setHasPendingSubscription] = useState(false);
@@ -88,7 +90,10 @@ const Signup = () => {
         console.warn("Initial profile write note:", dbErr);
       }
 
-      navigate('/onboarding');
+      const onboardingUrl = requestedPlanId
+        ? `/onboarding?plan=${encodeURIComponent(requestedPlanId)}`
+        : '/onboarding';
+      navigate(onboardingUrl);
     } catch (err: any) {
       console.error("Signup Error:", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -149,9 +154,9 @@ const Signup = () => {
       {/* Right: Signup Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 overflow-y-auto relative">
         
-        <Link to="/" className="absolute top-6 left-6 lg:left-12 flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-colors text-sm font-medium group z-20">
+        <a href={import.meta.env.VITE_LANDING_URL} className="absolute top-6 left-6 lg:left-12 flex items-center gap-2 text-slate-400 hover:text-slate-700 transition-colors text-sm font-medium group z-20">
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Back
-        </Link>
+        </a>
 
         <div className="w-full max-w-md space-y-8 mt-8 lg:mt-0">
           <div className="text-center lg:text-left">
@@ -175,7 +180,7 @@ const Signup = () => {
               <div className="flex-1">
                 {error}
                 {error.includes("already registered") && (
-                   <Link to="/login" className="block mt-1 font-bold underline hover:text-red-800">Login Now &rarr;</Link>
+                   <Link to={`/login${location.search}`} className="block mt-1 font-bold underline hover:text-red-800">Login Now &rarr;</Link>
                 )}
               </div>
             </div>
@@ -222,7 +227,7 @@ const Signup = () => {
             </button>
 
             <p className="text-center text-sm text-slate-500">
-              Already have an account? <Link to="/login" className="text-primary-600 font-bold hover:underline">Log in</Link>
+              Already have an account? <Link to={`/login${location.search}`} className="text-primary-600 font-bold hover:underline">Log in</Link>
             </p>
           </form>
         </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Check, Shield, Zap, Loader2, Tag, Lock, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateEffectivePrice } from '../services/saasStore';
@@ -13,6 +13,8 @@ import { getDaysDifference } from '../services/store';
 const OnboardingPayment = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPlanId = new URLSearchParams(location.search).get('plan');
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [isNewUser, setIsNewUser] = useState(true);
@@ -26,7 +28,7 @@ const OnboardingPayment = () => {
   const { plans, offer, loading: pricingLoading } = useGlobalPricing();
   
   // Selection State (Default to FreeTrial or Yearly)
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('FreeTrial');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(requestedPlanId || 'FreeTrial');
 
   // Helper to reliably get the active UID
   const getActiveUid = (): string => {
@@ -95,7 +97,12 @@ const OnboardingPayment = () => {
             const startLabel = earliestFootprint || (data.trialStartDate ? data.trialStartDate.split('T')[0] : '');
             setTrialIneligibleReason(`Your 30-day Free Trial was already activated${startLabel ? ` on ${startLabel}` : ''}. Free trial is strictly 1 time per business.`);
             // Automatically select paid plan
-            setSelectedPlanId(plans.find(p => p.isBestValue)?.id || plans[0]?.id || 'monthly');
+            setSelectedPlanId(
+              plans.find(p => p.id === requestedPlanId)?.id ||
+              plans.find(p => p.isBestValue)?.id ||
+              plans[0]?.id ||
+              'monthly'
+            );
           } else {
             // Truly new business account
             const isNew = !data.planName || data.planName === 'None' || data.planStatus === 'Pending' || data.planStatus === 'Inactive';
@@ -108,7 +115,12 @@ const OnboardingPayment = () => {
             setIsNewUser(false);
             setIsTrialEligible(false);
             setTrialIneligibleReason("A Free Trial was already activated on this account. Free trial is strictly 1 time per business.");
-            setSelectedPlanId(plans.find(p => p.isBestValue)?.id || plans[0]?.id || 'monthly');
+            setSelectedPlanId(
+              plans.find(p => p.id === requestedPlanId)?.id ||
+              plans.find(p => p.isBestValue)?.id ||
+              plans[0]?.id ||
+              'monthly'
+            );
           } else {
             setIsNewUser(true);
             setIsTrialEligible(true);
@@ -126,14 +138,17 @@ const OnboardingPayment = () => {
   // Ensure selection defaults correctly once plans load
   useEffect(() => {
     if (!pricingLoading && plans.length > 0 && !hasSetDefault) {
-      if (isNewUser && isTrialEligible) {
+      const requestedPlan = plans.find(plan => plan.id === requestedPlanId);
+      if (requestedPlan) {
+        setSelectedPlanId(requestedPlan.id);
+      } else if (isNewUser && isTrialEligible) {
         setSelectedPlanId('FreeTrial');
       } else {
         setSelectedPlanId(plans.find(p => p.isBestValue)?.id || plans[0].id);
       }
       setHasSetDefault(true);
     }
-  }, [pricingLoading, plans, isNewUser, isTrialEligible, hasSetDefault]);
+  }, [pricingLoading, plans, isNewUser, isTrialEligible, hasSetDefault, requestedPlanId]);
   
   // Check offer validity
   const isOfferActive = offer.isActive && new Date() < new Date(offer.endsAt);
@@ -267,10 +282,10 @@ const OnboardingPayment = () => {
     }
   };
 
-  const initiatePayment = () => {
+  const initiatePayment = (planId = selectedPlanId) => {
     if (!currentUser) return;
     
-    const selectedPlan = plans.find(p => p.id === selectedPlanId);
+    const selectedPlan = plans.find(p => p.id === planId);
     if (!selectedPlan) return;
 
     const email = currentUser.email || "";
@@ -498,7 +513,7 @@ const OnboardingPayment = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedPlanId(plan.id);
-                      initiatePayment();
+                      initiatePayment(plan.id);
                     }}
                     className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-300 ${
                       isSelected 
@@ -516,7 +531,7 @@ const OnboardingPayment = () => {
 
         <div className="max-w-md mx-auto text-center space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
           <button 
-            onClick={selectedPlanId === 'FreeTrial' ? activateFreeTrial : initiatePayment}
+            onClick={selectedPlanId === 'FreeTrial' ? activateFreeTrial : () => initiatePayment()}
             disabled={selectedPlanId === 'FreeTrial' && !isTrialEligible}
             className={`group w-full text-white font-bold py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3 text-lg relative overflow-hidden ${
               selectedPlanId === 'FreeTrial' && !isTrialEligible

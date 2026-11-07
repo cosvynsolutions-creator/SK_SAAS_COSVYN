@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Zap, CheckCircle, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -11,6 +11,11 @@ import { recordOwnerDailyLogin } from '../services/dbService';
 const Login = () => {
   const { loginWithEmail, currentUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPlanId = new URLSearchParams(location.search).get('plan');
+  const onboardingUrl = requestedPlanId
+    ? `/onboarding?plan=${encodeURIComponent(requestedPlanId)}`
+    : '/onboarding';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,10 +59,10 @@ const Login = () => {
         if (data.planStatus === 'Active') {
           navigate('/app/dashboard');
         } else {
-          navigate('/onboarding');
+          navigate(onboardingUrl);
         }
       } else {
-        navigate('/onboarding');
+        navigate(onboardingUrl);
       }
     } catch (e: any) {
       console.warn("Routing fallback after profile fetch error:", e.message);
@@ -209,7 +214,7 @@ const Login = () => {
             </form>
 
             <p className="mt-8 text-center text-sm text-slate-500">
-              New here? <Link to="/signup" className="text-primary-600 font-bold hover:underline">Create an account</Link>
+              New here? <Link to={`/signup${location.search}`} className="text-primary-600 font-bold hover:underline">Create an account</Link>
             </p>
           </div>
         </div>

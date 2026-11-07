@@ -10,22 +10,28 @@ import {
 } from 'lucide-react';
 import { useGlobalPricing, calculateEffectivePrice } from '../services/pricing';
 
-const appBaseUrl = (import.meta.env.VITE_APP_URL || '').replace(/\/$/, '');
+const appBaseUrl = (
+  import.meta.env.VITE_APP_URL ||
+  (import.meta.env.PROD ? 'https://scalekitchen.vercel.app' : '')
+).replace(/\/$/, '');
 
 const AuthLink: React.FC<{
   to: '/signup' | '/login';
+  planId?: string;
   className?: string;
   children: React.ReactNode;
-}> = ({ to, className, children }) => {
+}> = ({ to, planId, className, children }) => {
+  const search = planId ? `?plan=${encodeURIComponent(planId)}` : '';
+
   if (appBaseUrl) {
     return (
-      <a href={`${appBaseUrl}/#${to}`} className={className}>
+      <a href={`${appBaseUrl}/#${to}${search}`} className={className}>
         {children}
       </a>
     );
   }
   return (
-    <Link to={to} className={className}>
+    <Link to={`${to}${search}`} className={className}>
       {children}
     </Link>
   );
@@ -1125,6 +1131,7 @@ export const LandingPage: React.FC = () => {
 
                   <AuthLink 
                     to="/signup" 
+                    planId={plan.id}
                     className={`
                       w-full font-bold py-3.5 rounded-xl text-center text-sm transition-all block
                       ${plan.isBestValue 
