@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "strict": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@scalekitchen/types": ["packages/types/src/index.ts"],
+      "@scalekitchen/utils": ["packages/utils/src/index.ts"],
+      "@scalekitchen/ui": ["packages/ui/src/index.ts"],
+      "@scalekitchen/api-client": ["packages/api-client/src/index.ts"]
+    }
+  }
+}

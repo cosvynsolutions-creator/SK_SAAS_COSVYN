@@ -1,0 +1,201 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. HELPER: Robust check for Super Admin
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token != null && 
+             'email' in request.auth.token && (
+               request.auth.token.email.lower() == 'cosvynsolutions@gmail.com' || 
+               request.auth.token.email.lower() == 'admin@scalekitchen.in' ||
+               request.auth.token.email.lower() == 'memosmy10@gmail.com'
+             );
+    }
+
+    // 2. PUBLIC SETTINGS
+    match /global_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 3. ADMIN MESSAGES (Broadcast System)
+    match /admin_messages/{docId} {
+      allow read: if request.auth != null;
+      // Double layer of security/permission for the admin write
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 4. BUSINESS DATA (The core SaaS data)
+    match /businesses/{userId} {
+      allow get: if true; 
+      allow create: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow update: if 
+        isAdmin() || 
+        (
+          request.auth != null && request.auth.uid == userId && (
+            // A. First-time Free Trial activation (strictly blocked if trial was ever claimed or started before)
+            (
+              request.resource.data.planName == 'Free Trial' &&
+              (!('trialClaimed' in resource.data) || resource.data.trialClaimed != true) &&
+              (!('trialStartDate' in resource.data) || resource.data.trialStartDate == null) &&
+              request.resource.data.trialClaimed == true
+            ) ||
+            // B. Paid subscription activation/renewal with payment ID
+            (
+              'lastPaymentId' in request.resource.data && 
+              request.resource.data.lastPaymentId != null &&
+              request.resource.data.lastPaymentId != ''
+            ) ||
+            // C. Auto-marking expired when trial or subscription period has elapsed
+            (
+              request.resource.data.planStatus == 'Expired'
+            ) ||
+            // D. General profile, branding, stats sync, or daily login updates:
+            // STRICTLY FORBIDDEN from extending planExpiryDate to a later date, and FORBIDDEN from resetting trialClaimed
+            (
+              (!('trialClaimed' in request.resource.data) || request.resource.data.trialClaimed == resource.data.trialClaimed || resource.data.trialClaimed != true) &&
+              (!('trialStartDate' in request.resource.data) || request.resource.data.trialStartDate == resource.data.trialStartDate || !('trialStartDate' in resource.data)) &&
+              (
+                !('planExpiryDate' in request.resource.data) || 
+                request.resource.data.planExpiryDate == resource.data.planExpiryDate ||
+                // Allow fixing/repairing to an EARLIER date (anti-tamper repair)
+                request.resource.data.planExpiryDate <= resource.data.planExpiryDate
+              )
+            )
+          )
+        );
+      allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Subcollections needed for the Driver Web App & Live Route Tracking:
+      match /staff/{staffId} {
+        allow read: if true;
+        // Business owner or admin has full update permission.
+        // Drivers are strictly limited to updating live GPS, attendance, and online status.
+        allow update: if (request.auth != null && request.auth.uid == userId) || isAdmin() ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'currentLat', 'currentLng', 'lastLocationUpdate',
+              'lastAttendanceDate', 'attendanceMarkedAt', 'batteryLevel', 'updatedAt'
+            ])
+          );
+        allow create, delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /delivery_logs/{logId} {
+        // Allow reading logs and recording delivery completion / box recollection
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /customers/{customerId} {
+        // Allow public read for driver stop addresses, meal preference, phone, and box status
+        allow read: if true;
+        // Business owner, admin, or authenticated staff/manager can update customer status, preferences, pauses.
+        // Drivers without auth are strictly restricted to updating box collection tracking, uncollected count, and route order.
+        allow update: if request.auth != null ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'boxCollections', 'uncollectedBoxesCount', 'updatedAt', 'routeOrder'
+            ])
+          );
+        // Customer creation permitted for owner and staff/manager
+        allow create: if request.auth != null;
+        // Customer deletion strictly restricted to owner or admin
+        allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /plans/{planId} {
+        // Allow drivers and managers to read meal plan names/labels
+        allow read: if true;
+        allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /branches/{branchId} {
+        // Allow public read for driver & manager app branch identification
+        allow read: if true;
+        allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /managers/{managerId} {
+        // Allow manager login verification for authenticated users (including anonymous session auth)
+        allow read: if request.auth != null;
+        allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      match /manager_logs/{logId} {
+        // Allow recording manager login & logout audit timestamps
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+
+      // Operational subcollections (inventory, expenses, notes, single_orders, payments, invoices)
+      match /inventory/{itemId} {
+        allow read, write: if request.auth != null;
+      }
+      match /expenses/{expenseId} {
+        allow read, write: if request.auth != null;
+      }
+      match /notes/{noteId} {
+        allow read, write: if request.auth != null;
+      }
+      match /single_orders/{orderId} {
+        allow read, write: if request.auth != null;
+      }
+      match /payments/{paymentId} {
+        allow read, write: if request.auth != null;
+      }
+      match /invoices/{invoiceId} {
+        allow read, write: if request.auth != null;
+      }
+      match /box_types/{boxId} {
+        allow read: if true;
+        allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+      match /billing_history/{docId} {
+        allow read, write: if true;
+      }
+
+      // All other subcollections (billing, settings, sensitive credentials) remain strictly private to the business owner
+      match /{allSubcollections=**} {
+        allow read, write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
+    }
+
+    // 5. PENDING ACTIVATIONS (Prevent public listing of all pending subscriber emails)
+    match /pending_activations/{email} {
+      allow get: if true; 
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 6. FREE TRIAL REGISTRY (Prevent repeated free trial creation with same email or mobile)
+    match /trial_claims/{claimKey} {
+      allow read: if true;
+      allow create: if true; // Allows recording trial on first activation
+      allow update, delete: if isAdmin(); // Strictly immutable once claimed; only Super Admin can modify
+    }
+
+    // 7. COLLECTION GROUPS (For Admin Panel Analytics)
+    match /{path=**}/billing_history/{docId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == path[1]);
+    }
+    match /{path=**}/payments/{docId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == path[1]);
+    }
+
+    // 8. GLOBAL INTERACTIONS
+    match /global_features/{docId} { allow read, write: if request.auth != null; }
+    match /global_tickets/{docId} { allow read, write: if request.auth != null; }
+    match /global_reviews/{docId} { allow read, write: if request.auth != null; }
+
+    // 9. DRIVER SECURE AUTH & LOOKUP (Multi-browser Phone + PIN login directory)
+    match /driver_auth_lookup/{mobileDigits} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

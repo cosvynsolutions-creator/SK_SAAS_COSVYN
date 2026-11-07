@@ -1,0 +1,6 @@
+{
+  "name": "ScaleKitchen – SaaS for Subscription Meal Businesses",
+  "description": "A smart SaaS platform built for meal subscription businesses to manage customers, deliveries, payments, expenses, and analytics effortlessly.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

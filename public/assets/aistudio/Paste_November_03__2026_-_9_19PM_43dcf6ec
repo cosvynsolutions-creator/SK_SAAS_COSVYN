@@ -1,0 +1,850 @@
+# ScaleKitchen — Phase 3: Production-Safe Delivery Boy Frontend Extraction
+
+You are acting as a Principal Software Architect, Senior React/TypeScript Engineer, Firebase Security Engineer, and QA Engineer.
+
+You are working on the existing ScaleKitchen production SaaS codebase.
+
+Phase 1 established the monorepo foundation.
+Phase 2 created the independent public Landing application at:
+
+apps/landing/
+
+The next task is to extract the Delivery Boy application into:
+
+apps/delivery/
+
+This is a production application with existing real businesses, delivery partners, customers, subscriptions, attendance records, delivery records, and Firestore data.
+
+Your first priority is preserving existing production functionality, authentication, data integrity, tenant isolation, and backward compatibility.
+
+---
+
+# PHASE 3 OBJECTIVE
+
+Create a completely independent, independently buildable Delivery Boy frontend inside:
+
+apps/delivery/
+
+It must share the existing Firebase project and backend with the other ScaleKitchen applications.
+
+It must not depend on the root React SPA at runtime.
+
+The existing root Delivery application must remain operational as a fallback until the new application is independently deployed, tested, and approved.
+
+Do not start Manager, Admin, Owner, backend migration, or API refactoring in this phase.
+
+# CRITICAL RULES — READ BEFORE CODING
+
+1. Do not delete the original root Delivery implementation.
+2. Do not remove the `/driver` route from root `App.tsx`.
+3. Do not modify the root route normalizer for `/driver`.
+4. Do not change existing Delivery Boy link-generation code in the Owner application.
+5. Do not break existing WhatsApp delivery links.
+6. Do not change Firebase Authentication configuration in the root application.
+7. Do not change Firestore schemas, documents, collections, or field names.
+8. Do not modify Firebase Security Rules.
+9. Do not modify any existing Firebase Cloud Function.
+10. Do not modify Razorpay code or payment logic.
+11. Do not modify Owner, Manager, Admin, or Landing application functionality.
+12. Do not modify the root production Vercel configuration.
+13. Do not deploy anything.
+14. Do not change existing Firebase project configuration or project ID.
+15. Do not introduce mock business data into production Firestore.
+16. Do not implement a new authentication mechanism.
+17. Do not weaken authentication or authorization to make the extraction work.
+18. Do not perform database migrations.
+19. Do not upgrade major package versions unnecessarily.
+20. Do not claim that any test passed unless it was actually executed.
+
+If a requirement cannot be implemented safely without modifying existing backend code, Firestore Rules, or another production application, STOP and report the blocker. Do not make an unauthorized workaround.
+
+---
+
+# STEP 1 — COMPLETE PRE-IMPLEMENTATION AUDIT
+
+Before changing any files, inspect the current repository.
+
+Read the complete contents of the following files and their actual dependencies:
+
+- `pages/DriverPortal.tsx`
+- `App.tsx`
+- `services/firebase.ts`
+- `services/store.ts`
+- `services/messageTemplates.ts`
+- `functions/index.js`
+- `firestore.rules`
+- `test/firestore-rules.test.ts`
+- `docs/architecture/target-architecture.md`
+- `docs/migration/file-migration-map.md`
+- `docs/testing/regression-test-plan.md`
+- `apps/landing/package.json`
+- `apps/landing/vite.config.ts`
+- `apps/landing/vercel.json`
+- Root `package.json`
+- Root TypeScript and Vite configuration
+- Existing delivery-related components and helper files
+
+Inspect all imports used by DriverPortal.tsx. Follow the dependency chain until every required helper, type, service, and asset is identified.
+
+Do not rely on previous AI-generated summaries. Verify the actual source code.
+
+## Produce a dependency inventory
+
+Identify:
+
+A. Delivery UI components and screens.
+
+B. Delivery authentication flow.
+
+C. Firebase Auth initialization and persistence.
+
+D. Firebase Cloud Function calls.
+
+E. Firestore reads and writes.
+
+F. Delivery-specific types and interfaces.
+
+G. Pure business logic helpers.
+
+H. WhatsApp message helpers.
+
+I. GPS/location functionality.
+
+J. Attendance and shift management.
+
+K. Meal-session selection.
+
+L. Customer delivery and reusable-box workflows.
+
+M. Demo mode and offline behavior.
+
+N. URL parameter decoding and legacy link handling.
+
+O. Browser storage dependencies.
+
+P. All external library dependencies.
+
+Q. Existing Firestore Security Rule conditions that authorize Delivery users.
+
+## Produce an exact collection access map
+
+Identify all Firestore collections and document paths read or written by the current Delivery portal.
+
+At minimum, investigate the existing usage of:
+
+- `businesses/{bizId}/staff`
+- `businesses/{bizId}/customers`
+- `businesses/{bizId}/plans`
+- `businesses/{bizId}/branches`
+- `businesses/{bizId}/delivery_logs`
+- `businesses/{bizId}/driver_manifest`
+- `businesses/{bizId}/driver_status`
+- `businesses/{bizId}/driver_sessions`
+
+Do not assume the list above is complete. Discover all actual references.
+
+For each operation, document:
+- Collection/document path.
+- Read, create, update, or delete.
+- Fields used.
+- Authentication or role requirements.
+- Branch restrictions, where applicable.
+- Whether the operation is performed by the Delivery portal or a Cloud Function.
+
+## Authentication contract
+
+Read the real implementation of `driverLogin` in `functions/index.js`.
+
+The current server-side authentication flow uses:
+
+1. Delivery partner enters registered mobile number and PIN.
+2. Frontend invokes the `driverLogin` callable Cloud Function.
+3. Cloud Function validates credentials and rate limits.
+4. Cloud Function creates a Firebase Custom Token.
+5. Frontend signs in using `signInWithCustomToken`.
+6. The authenticated user receives claims including:
+   - `role`
+   - `bizId`
+   - `staffId`
+   - `branchId`
+
+Verify the exact current implementation and returned data shape.
+
+Do not invent or alter this contract.
+
+If the current Security Rules do not permit the required authenticated Delivery operations, STOP and report the exact mismatch. Do not modify the rules.
+
+## Preflight gate
+
+Before implementation, report:
+
+- Exact files you intend to copy or create.
+- Existing code that must remain untouched.
+- The authentication flow you will preserve.
+- The Firestore collections and operations you identified.
+- Dependencies that need to be isolated.
+- Any blockers or security concerns.
+
+If there is a serious blocker, stop before coding.
+
+If the audit shows that the extraction can proceed without changing production backend behavior or weakening security, continue with implementation.
+
+---
+
+# STEP 2 — CREATE THE INDEPENDENT DELIVERY APPLICATION
+
+Create:
+
+apps/delivery/
+
+Use the existing project conventions and compatible versions.
+
+The application must have its own:
+
+- `package.json`
+- `index.html`
+- `vite.config.ts`
+- `tsconfig.json`
+- `src/main.tsx`
+- `src/App.tsx`
+- `src/index.css`
+- Firebase initialization service
+- Delivery-specific services
+- Delivery-specific domain types and helpers
+- Components/pages as needed
+- `vercel.json`
+- `.env.example`
+- README
+
+Use the actual dependencies required by the current Delivery application.
+
+Keep compatible versions aligned with the existing root application and established Landing workspace.
+
+Do not upgrade React, Firebase, TypeScript, Vite, or other major dependencies without a necessary compatibility reason.
+
+The Delivery application must be buildable independently through workspace scripts.
+
+It must not import runtime code from:
+
+- Root `App.tsx`
+- Root pages
+- Root contexts
+- Root Owner components
+- Root Manager components
+- Root routing
+- Root application entry point
+
+Do not use relative imports that escape `apps/delivery` to reach production application files.
+
+---
+
+# STEP 3 — PRESERVE COMPLETE DELIVERY FUNCTIONALITY
+
+This is an extraction, not a redesign or feature reduction.
+
+Preserve every existing Delivery Boy capability and its behavior.
+
+Inspect the entire original `pages/DriverPortal.tsx`, not just the login screen.
+
+The new app must preserve all existing functionality, including wherever implemented:
+
+1. Delivery Boy mobile number and PIN login.
+2. Server-verified authentication.
+3. Authenticated session restoration.
+4. Driver profile and assigned branch.
+5. Customer delivery list.
+6. Customer name, phone, address, and relevant delivery details.
+7. Route order and assigned delivery stops.
+8. Breakfast, Lunch, and Dinner selection.
+9. Existing time-based default meal-session helper.
+10. Manual meal-session selection.
+11. Delivery completion and status updates.
+12. Delivery notes and relevant status information.
+13. Reusable box collection and condition tracking.
+14. Reusable-box notes.
+15. Punch-in and attendance tracking.
+16. Punch-out and shift management.
+17. GPS/location updates.
+18. WhatsApp customer communication.
+19. Delivery manifest and status synchronization.
+20. Existing branch and assignment restrictions.
+21. Loading states.
+22. Error messages.
+23. Empty states.
+24. Network and offline handling.
+25. Existing toast messages and user feedback.
+26. Existing mobile-responsive layouts.
+27. Existing logout behavior.
+28. Existing demo mode, subject to the safety restrictions below.
+29. Existing supported legacy link parameters.
+
+Do not remove features just because they appear complicated.
+
+Preserve UI behavior and the current business logic as closely as possible.
+
+If a component or helper cannot be safely extracted, document it instead of silently replacing it with a simplified version.
+
+## Demo mode isolation
+
+Inspect the original demo mode thoroughly.
+
+Preserve demo functionality only if it remains completely isolated from real production business data.
+
+Demo mode must never write demo customers, demo staff, delivery logs, or attendance records into a real business.
+
+Do not let a demo business ID or sample data reach production Firestore writes.
+
+---
+
+# STEP 4 — DELIVERY AUTHENTICATION ISOLATION
+
+This is one of the most important parts of Phase 3.
+
+The new application must use the same Firebase project but must have its own Firebase app/auth initialization boundary.
+
+Create a Delivery-specific Firebase service, for example:
+
+apps/delivery/src/services/firebase.ts
+
+Use the existing public Firebase web configuration and the same existing Firebase project.
+
+Use a uniquely named Firebase app instance, such as:
+
+`initializeApp(firebaseConfig, 'ScaleKitchenDelivery')`
+
+Initialize the Delivery app's own:
+
+- Firebase Auth instance.
+- Firestore instance.
+- Firebase Functions instance.
+- `driverLogin` callable.
+
+Use the correct existing authentication persistence behavior supported by the current app and browser environment.
+
+The named Firebase app also prevents accidental sharing of the default Firebase Auth instance when testing multiple apps in the same browser origin.
+
+Do not create a new Firebase project.
+
+Do not use Firebase Admin SDK in frontend code.
+
+Do not expose service-account credentials.
+
+Do not use anonymous authentication as a substitute for Delivery authentication.
+
+Do not authenticate using a `bizId`, `staffId`, phone number, PIN, or encoded URL value alone.
+
+## Required login behavior
+
+The only permitted new Delivery login path is the existing server-verified `driverLogin` Cloud Function.
+
+Call the existing function with the same request contract.
+
+Use the returned custom token with:
+
+`signInWithCustomToken`
+
+Do not implement client-side PIN verification.
+
+Do not use bcrypt in the browser to authenticate Delivery partners.
+
+Do not create an alternate legacy PIN fallback.
+
+The original root app must remain untouched even if it contains old compatibility code.
+
+## Authenticated identity
+
+After successful sign-in:
+
+- Listen to the Delivery app's own `onAuthStateChanged`.
+- Read the authenticated Firebase ID token claims.
+- Verify the expected Delivery role and relevant identity claims.
+- Derive the active business, staff member, and branch from verified authentication data.
+- Do not treat localStorage or URL parameters as proof of identity.
+- Ensure a user cannot select another staff ID or business ID by changing the URL or browser storage.
+- Ensure Delivery queries and writes use the authenticated identity and the existing Firestore permission model.
+
+Do not silently grant business-wide access to a Delivery partner.
+
+Do not bypass branch restrictions.
+
+If a necessary identity claim is missing or mismatched, fail securely and show a useful error.
+
+## Logout behavior
+
+- Sign out from the Delivery app's Auth instance only.
+- Clear Delivery-specific local/session storage values.
+- Do not sign out Owner or Manager accounts.
+- Do not clear unrelated application storage.
+- Do not use a browser-wide storage wipe.
+
+Do not modify the original root Firebase service.
+
+---
+
+# STEP 5 — LEGACY DELIVERY LINK COMPATIBILITY
+
+Existing delivery partners may already have WhatsApp links generated by ScaleKitchen owners.
+
+The original links may contain parameters such as:
+
+- `auth`
+- `k`
+- `token`
+- `biz`
+- `boy`
+- `phone`
+
+Inspect the existing `decodeDriverToken` implementation and current URL parsing logic.
+
+Preserve the exact existing parsing and decoding compatibility where required.
+
+The new Delivery frontend must support the relevant legacy URL formats without corrupting, losing, or incorrectly decoding their parameters.
+
+However:
+
+IMPORTANT SECURITY RULE:
+
+These encoded URL parameters are not authentication proof.
+
+They may be used only for the same non-authoritative purposes supported by the existing implementation, such as prefilling or resolving expected business/driver context.
+
+The authenticated `driverLogin` result and Firebase token claims must determine the actual authenticated identity.
+
+Do not allow a manipulated `biz`, `boy`, `phone`, or decoded `auth` parameter to grant access.
+
+Test query parameters in both standard URL search strings and hash-based URL formats.
+
+Preserve the existing legacy root route and existing old links.
+
+Do not change the Owner app's link generator in this phase.
+
+Do not remove the root `/driver` route.
+
+Do not redirect production users to the new app yet.
+
+## Owner preview behavior
+
+Inspect the existing Owner preview behavior.
+
+Do not weaken Delivery authentication to make cross-app Owner preview work.
+
+The current root Owner preview must remain available through the unchanged root application.
+
+Document any preview behavior that cannot safely be provided in the independent Delivery app.
+
+---
+
+# STEP 6 — EXTRACT TYPES AND PURE UTILITIES SAFELY
+
+The original Delivery portal imports types and helpers from `services/store.ts`, including functions and definitions related to:
+
+- `BoxRecollectionStatus`
+- `REUSABLE_BOX_TYPES`
+- `DeliveryBoyStaff`
+- `GlobalCustomer`
+- `SubscribedPlan`
+- `getTodayStr`
+- `isCustomerDeliveryDay2Plus`
+- `getCustomerScheduledPlansForSession`
+- `isPlanActiveOnDate`
+- `formatDateDDMMYYYY`
+- `decodeDriverToken`
+- `normalizePhone`
+- `isReusableBoxType`
+- `getDefaultMealSessionForTime`
+- `MealSession`
+
+The exact dependency list must be determined from the current source code.
+
+Also inspect and preserve the relevant functions in `services/messageTemplates.ts`, such as:
+
+- `buildWhatsAppUrl`
+- `getDeliveryArrivalMessage`
+
+Do not import the entire root `services/store.ts` into the new app.
+
+Do not import root services or root contexts at runtime.
+
+Preferred approach:
+
+- Place reusable delivery-only types in `packages/types` when appropriate.
+- Place genuinely pure delivery utilities in `packages/utils` when appropriate.
+- Keep Firebase-specific and Delivery-specific runtime services inside `apps/delivery`.
+- If a pure helper cannot safely be shared yet, copy its exact implementation into a clearly named Delivery-specific module.
+- Document the original source path for every copied helper.
+- Add tests to ensure copied helper behavior matches the original.
+- Do not refactor the existing root implementation during this phase.
+
+Avoid unnecessary abstraction or a large shared-package redesign.
+
+---
+
+# STEP 7 — FIRESTORE DATA INTEGRITY AND SECURITY
+
+The new application must use the existing Firestore schema and existing Firebase Security Rules.
+
+Do not change:
+
+- Collection paths.
+- Document IDs.
+- Field names.
+- Timestamp formats.
+- Delivery status values.
+- Meal-session values.
+- Customer subscription structure.
+- Delivery log identifiers.
+- Reusable-box structure.
+- Attendance structure.
+- Existing branch assignment fields.
+
+Preserve the exact read/write semantics of the current Delivery portal.
+
+For every extracted read/write operation:
+
+1. Compare it with the original source.
+2. Ensure the same document path is used.
+3. Ensure the same required fields are written.
+4. Ensure existing metadata and timestamps are preserved.
+5. Ensure updates do not overwrite unrelated customer/business data.
+6. Ensure branch and driver identity restrictions remain effective.
+7. Ensure errors are surfaced instead of silently ignored.
+
+Do not create a new database layer or move the application to Express.
+
+Do not migrate Firestore operations to a mock API.
+
+Do not alter Security Rules to make new frontend calls succeed.
+
+If a query or write fails under the existing rules, investigate the actual rule and report the issue rather than broadening access.
+
+---
+
+# STEP 8 — DELIVERY APPLICATION ROUTING AND CONFIGURATION
+
+Create a standalone Delivery application routing structure.
+
+The new application should be usable from an independent domain or Vercel preview URL.
+
+Support a simple Delivery entry route and preserve the relevant legacy URL parsing behavior.
+
+Add independent Vite configuration.
+
+Set a dedicated development port that does not conflict with the root SPA or Landing app.
+
+Create `apps/delivery/vercel.json` for clean routing and appropriate security headers.
+
+Do not change root `vercel.json`.
+
+Do not change any existing production Vercel project settings.
+
+Prepare the application for an independent Vercel project with:
+
+- Root Directory: `apps/delivery`
+- Framework: Vite
+- Build Command: appropriate workspace-aware command
+- Output Directory: `dist`
+- Install Command: consistent with the repository's actual workspace and lockfile configuration
+
+Inspect the actual package manager and lockfiles before deciding the install command.
+
+Do not change package managers or regenerate unrelated lockfiles.
+
+Document the Vercel configuration accurately. Do not deploy.
+
+---
+
+# STEP 9 — ENVIRONMENT VARIABLE AND SECRET HYGIENE
+
+Create only:
+
+`apps/delivery/.env.example`
+
+Do not create or commit a real `.env` file.
+
+Do not copy any existing private environment file into the new application.
+
+Do not expose:
+
+- Firebase Admin credentials.
+- Service-account JSON.
+- Razorpay secret keys.
+- Private API keys.
+- Any server-only secrets.
+
+Firebase web configuration is not a substitute for server credentials.
+
+Use only the environment variables genuinely required by the Delivery frontend.
+
+Never put a secret in a `VITE_` variable because Vite variables are bundled into browser code.
+
+Do not change or disclose existing environment variable values.
+
+---
+
+# STEP 10 — INDEPENDENT BUILD AND ROOT APP PRESERVATION
+
+Add only the necessary root workspace scripts, following the existing Landing scripts.
+
+Expected scripts:
+
+- `build:delivery`
+- `dev:delivery`
+- `lint:delivery`
+
+Use the correct workspace package name.
+
+Keep all existing root scripts intact.
+
+The following must remain functional:
+
+- Root production SPA.
+- Root Landing fallback.
+- Root Owner portal.
+- Root Manager portal.
+- Root Delivery fallback.
+- Root Admin portal.
+- Existing Firebase integration.
+- Existing payment integration.
+- Existing Cloud Functions.
+
+Do not delete or move the original `pages/DriverPortal.tsx`.
+
+Do not delete or modify root `App.tsx` Delivery route.
+
+Do not delete or modify root `services/firebase.ts`.
+
+Do not modify `functions/index.js`.
+
+Do not modify `firestore.rules`.
+
+Do not modify the Owner delivery-link generation code.
+
+Do not modify root Vercel configuration.
+
+Do not begin extraction of any other application.
+
+---
+
+# STEP 11 — TESTING REQUIREMENTS
+
+Create meaningful Delivery-specific tests.
+
+At minimum, test:
+
+## Authentication tests
+
+- Valid mobile number and PIN request calls the correct callable.
+- Successful callable response signs in with the returned custom token.
+- Invalid PIN is rejected.
+- Rate-limit errors are displayed correctly.
+- Deactivated delivery partner errors are displayed correctly.
+- Expired business subscription errors are displayed correctly.
+- Authentication state is restored on refresh.
+- Invalid or missing role claims are rejected.
+- Wrong business/staff identity is rejected.
+- Logout signs out only the Delivery Firebase app.
+
+Use mocked callable/auth responses or Firebase Emulator tests as appropriate.
+
+Do not test real production credentials or modify live accounts.
+
+## Legacy link tests
+
+- Existing supported `auth` parameter is parsed.
+- Existing `k` and `token` formats are handled where currently supported.
+- `biz`, `boy`, and `phone` are parsed correctly.
+- Hash query parameters are handled.
+- Browser URL cleanup does not destroy required values before they are captured.
+- Tampered link parameters cannot bypass PIN authentication.
+- A link cannot grant access to another business or staff member.
+
+## Business logic tests
+
+Test copied pure helper functions against their root implementations.
+
+Include tests for:
+
+- Default meal session.
+- Meal-session boundary behavior.
+- Date calculations.
+- Customer delivery eligibility.
+- Plan activity and pauses.
+- Phone normalization.
+- Reusable-box status logic.
+- Legacy token decoding.
+
+Do not change business logic merely to make a test pass.
+
+## Delivery workflow tests
+
+Test the relevant workflows with mocks or an approved emulator:
+
+- Load assigned delivery customers.
+- Load the correct business and branch data.
+- Mark a delivery complete.
+- Save reusable-box collection status.
+- Save delivery notes.
+- Punch in.
+- Punch out.
+- Write attendance/session records.
+- Update driver status.
+- Handle GPS permission denial.
+- Handle Firestore permission errors.
+- Handle network errors.
+- Ensure demo mode cannot write to real business records.
+
+Clearly distinguish mocked tests from real Firebase Emulator integration tests.
+
+Never claim end-to-end testing against production if it was not performed.
+
+## Required repository checks
+
+Run:
+
+1. `npm run lint`
+2. `npm test`
+3. `npm run build`
+4. `npm run lint:landing`
+5. `npm run build:landing`
+6. `npm run lint:delivery`
+7. `npm run build:delivery`
+8. Existing Firestore Rules tests if available.
+9. `git diff --check`
+
+Also verify:
+
+- No imports from root production runtime files inside `apps/delivery/src`.
+- No `bcryptjs` browser-side authentication.
+- No anonymous authentication fallback.
+- No bypass of `driverLogin`.
+- No modified Firebase Security Rules.
+- No modified Cloud Function exports.
+- No modified Owner link generator.
+- No modified root production routes.
+- No deleted existing files.
+- No real `.env` files added.
+- No accidental mock production data.
+- No unexpected dependency upgrades.
+
+If a check fails, investigate and fix it before declaring Phase 3 complete.
+
+Do not hide or downgrade failures.
+
+---
+
+# STEP 12 — DOCUMENTATION
+
+Create:
+
+`docs/migration/phase-3-delivery.md`
+
+Update:
+
+- `docs/architecture/target-architecture.md`
+- `docs/migration/file-migration-map.md`
+- `docs/testing/regression-test-plan.md`
+- `apps/delivery/README.md`
+
+Document:
+
+1. New Delivery application architecture.
+2. Exact source files copied.
+3. Files created.
+4. Files modified.
+5. Files moved.
+6. Files deleted.
+7. Delivery authentication flow.
+8. Firebase app isolation strategy.
+9. Custom token claims.
+10. Firestore collection access map.
+11. Branch and tenant isolation behavior.
+12. Legacy delivery link compatibility.
+13. Original root fallback behavior.
+14. Business workflows preserved.
+15. Shared types/helpers and their source paths.
+16. Test cases and actual results.
+17. Build and run commands.
+18. Independent Vercel project configuration.
+19. Environment variables required.
+20. Rollback procedure.
+21. Known limitations and unresolved risks.
+
+---
+
+# STEP 13 — FINAL PRODUCTION SAFETY AUDIT
+
+Before declaring completion, compare the original root Delivery implementation with the new independent app.
+
+Confirm that all original Delivery functions have an equivalent implementation.
+
+Provide a feature-by-feature parity table:
+
+| Existing functionality | New app implemented | Tested | Notes |
+|---|---|---|---|
+
+Provide a Firestore operation parity table:
+
+| Operation | Original path | New path | Fields preserved | Rules unchanged |
+|---|---|---|---|---|
+
+Provide a change summary:
+
+- Files created.
+- Files modified.
+- Files moved.
+- Files deleted.
+- Dependencies added or changed.
+- Lockfiles changed.
+- Root application changes.
+- Shared package changes.
+- Firebase changes.
+- Vercel changes.
+
+Explicitly confirm the state of:
+
+- Root `/driver` route.
+- Root `DriverPortal.tsx`.
+- Legacy delivery links.
+- Owner link generator.
+- `services/firebase.ts`.
+- `functions/index.js`.
+- `firestore.rules`.
+- Firestore schema.
+- Razorpay.
+- Root `vercel.json`.
+- Landing app.
+- Owner app.
+- Manager app.
+- Admin app.
+
+Provide exact commands and actual test results.
+
+If a test could not be executed, mark it NOT RUN.
+
+If a test was mocked, mark it MOCKED.
+
+Do not represent a successful build as proof of production authentication or Firestore security.
+
+## FINAL COMPLETION GATE
+
+Phase 3 can be declared complete only when:
+
+- Independent Delivery app builds.
+- Root SPA builds.
+- Landing app still builds.
+- Existing tests pass.
+- Delivery-specific tests pass.
+- Authentication contract is preserved.
+- Firestore access behavior is preserved.
+- Legacy links remain compatible.
+- Root fallback remains operational.
+- No production backend/security changes were made.
+- No existing functionality was silently removed.
+
+Do not deploy.
+
+Do not merge into `main`.
+
+Do not start Manager, Admin, or Owner extraction.
+
+Stop after Phase 3 and provide the complete implementation report.

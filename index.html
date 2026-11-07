@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Circular structure protection for AI Studio dev wrapper and Firestore events
+      (function() {
+        var origStringify = JSON.stringify;
+        JSON.stringify = function(value, replacer, space) {
+          try {
+            return origStringify(value, replacer, space);
+          } catch (err) {
+            if (err && (err.message || '').indexOf('circular') !== -1) {
+              var seen = new WeakSet();
+              return origStringify(value, function(k, v) {
+                if (typeof v === 'object' && v !== null) {
+                  if (seen.has(v)) return '[Circular]';
+                  seen.add(v);
+                }
+                if (typeof replacer === 'function') return replacer.call(this, k, v);
+                return v;
+              }, space);
+            }
+            throw err;
+          }
+        };
+      })();
+    </script>
+    <title>ScaleKitchen – Tiffin Service & Meal Subscription Management Software</title>
+    <meta name="description" content="ScaleKitchen by COSVYN is the all-in-one operating system for meal subscription and tiffin businesses. Includes recurring renewals, branch manager portal, rider mobile app with GPS route optimizer, kitchen prep sheet, and reusable dabba tracker." />
+    <meta name="keywords" content="tiffin service management software, meal subscription software, tiffin delivery app, kitchen prep software, meal prep software india, dabba tracker software, delivery route optimizer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ScaleKitchen – Tiffin Service & Meal Subscription Management Software" />
+    <meta property="og:description" content="Stop losing customer renewals and reusable dabbas. Automate meal subscriptions, kitchen prep counts, multi-branch operations, and rider deliveries." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ScaleKitchen – Tiffin Service & Meal Subscription Management Software" />
+    <meta name="twitter:description" content="Automate meal prep orders, route optimization, branch manager control, and recurring billing for tiffin services." />
+    
+    <!-- Schema.org SoftwareApplication Structured Data for Google & AI Discovery -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "ScaleKitchen",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Mobile Browser (PWA)",
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "INR",
+        "lowPrice": "1499",
+        "highPrice": "9999",
+        "offerCount": "3"
+      },
+      "description": "Operating system for meal subscription and tiffin services. Centralizes customer subscriptions, kitchen prep displays, multi-branch manager hubs, driver delivery apps with route optimization, and automated GST billing.",
+      "featureList": [
+        "Recurring Meal Subscription & Renewal Automation",
+        "Branch Manager Web Portal with Hub Isolation",
+        "Delivery Rider Mobile App with Turn-by-Turn GPS",
+        "Shortest Route Optimizer for Multi-Stop Drops",
+        "Reusable Tiffin Box (Dabba) Recovery Tracking",
+        "Live Kitchen Preparation Display (KDS)",
+        "GST Invoice Engine & WhatsApp Billing Integration",
+        "Customer Pause, Resume & Vacation Calendar"
+      ],
+      "author": {
+        "@type": "Organization",
+        "name": "COSVYN"
+      }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+              display: ['"Outfit"', '"Plus Jakarta Sans"', 'sans-serif'],
+            },
+            colors: {
+              primary: {
+                50: '#f0f5ff',
+                100: '#e0ebff',
+                200: '#c2d6ff',
+                300: '#94b8ff',
+                400: '#5c91ff',
+                500: '#2962ff',
+                600: '#0d40e6',
+                700: '#0830c2',
+                800: '#0d2899',
+                900: '#10247a',
+              },
+              violet: {
+                500: '#8b5cf6',
+                600: '#7c3aed',
+              }
+            },
+            boxShadow: {
+              'glass': '0 8px 30px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03)',
+              'glass-hover': '0 16px 36px -6px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.04)',
+              'glass-lg': '0 20px 45px -10px rgba(15, 23, 42, 0.1), 0 8px 16px -4px rgba(15, 23, 42, 0.04)',
+            },
+            animation: {
+              'scroll': 'scroll 25s linear infinite',
+              'float': 'float 6s ease-in-out infinite',
+            },
+            keyframes: {
+              scroll: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(-100%)' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-20px)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "firebase/": "https://aistudiocdn.com/firebase@11.3.1/"
+  }
+}
+</script>
+<style>
+  /* Global Scrollbar Hiding */
+  * {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+
+  /* REMOVE NUMBER INPUT SPINNERS (Up/Down Arrows) */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+  
+  /* Smooth Scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  }
+
+  .glass-card-dark {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Utilities */
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
+  }
+  .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+  }
+</style>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50/60 text-slate-800 antialiased font-sans selection:bg-primary-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

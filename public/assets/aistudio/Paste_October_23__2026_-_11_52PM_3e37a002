@@ -1,0 +1,886 @@
+If you want to increase traffic for ScaleKitchen by COSVYN — your SaaS application for meal subscription business owners — you need to do more than run Instagram ads. You need a system that makes business owners discover your product on Google, see recommendations when they ask ChatGPT or Claude for software, and visit your website through relevant online communities.
+
+The strategy I recommend is to build three traffic channels together:
+
+1. Google SEO — capture people already searching
+
+Target searches such as “meal subscription management software India,” “tiffin service management software,” and “meal delivery business software.”
+
+Goal: consistent, long-term organic traffic.
+
+
+
+
+2. AI search visibility — earn recommendations from ChatGPT and Claude
+
+Make your product easy for AI systems to discover, understand, verify, and recommend when users ask for meal subscription management tools.
+
+Goal: appear in relevant AI-generated answers where your product is a good fit.
+
+
+
+
+3. Content and distribution — get in front of business owners
+
+Publish useful guides, comparison pages, product demos, YouTube videos, and posts in relevant business communities.
+
+Goal: targeted visitors who could become paying SaaS customers.
+
+
+
+The important distinction: you don't just want more visitors. You want meal subscription business owners visiting ScaleKitchen, signing up for your trial, and eventually becoming paying customers.
+1. First, fix the AI discovery of your website
+I checked the public URLs you previously shared: COSVYN's website and ScaleKitchen's application. I could not inspect the ScaleKitchen application successfully with my web access, so I can't yet confirm its current SEO setup, indexability, or technical implementation.
+
+Your application being accessible to you in a browser does not automatically mean search engines and AI search tools can discover its content.
+The technical checklist
+Google Search Console
+
+Verify your domain, submit your sitemap, inspect your public pages, and check indexing errors.
+
+Start here: Google Search Console
+
+
+
+Allow ChatGPT Search to discover your content
+
+Check your robots.txt, CDN, firewall and hosting settings. Ensure OAI-SearchBot is allowed to crawl your public marketing pages. This helps your pages become eligible for ChatGPT Search; it does not guarantee recommendations. 
+
+OpenAI Help Center
++1
+
+
+
+
+
+
+Make the website readable to AI search
+
+Ensure Claude-SearchBot and Claude-User are not unintentionally blocked if you want your content discovered and retrieved in Claude. Review Anthropic's official crawler guidance. 
+
+Anthropic Help Center
+
+
+
+
+
+
+Create crawlable public pages
+
+Your pricing, features, integrations, business use cases, FAQs and contact information should be available as normal public webpages—not hidden behind an account login or visible only after opening the application.
+
+
+
+Important: your public marketing website should be the main destination for Google and AI discovery. Keep your actual SaaS dashboard and customer data protected behind authentication.
+2. Build pages for the exact searches your customers make
+Instead of relying on a single landing page, build a focused set of pages around the problems ScaleKitchen solves.
+
+Here are the first pages I would prioritize.
+
+
+
+
+
+
+
+
+
+Tiffin Service Management Software
+
+Suggested URL: /tiffin-service-management-software
+
+Target tiffin operators managing recurring orders, customer plans, renewals and payments.
+
+
+
+
+
+
+
+
+
+
+
+
+Meal Subscription Management Software
+
+Suggested URL: /meal-subscription-management-software
+
+Explain the complete workflow, from customer subscription to kitchen preparation and delivery.
+
+
+
+
+
+
+
+
+
+
+
+
+Meal Delivery Route and Operations Management
+
+Suggested URL: /meal-delivery-management
+
+Show how delivery assignments, routes, branches and daily box counts work.
+
+
+
+
+
+
+
+
+
+
+
+
+Best Software for Tiffin and Meal Prep Businesses in India
+
+Suggested URL: /best-tiffin-management-software-india
+
+Provide an honest buyer's guide explaining essential features, costs, alternatives and who benefits from ScaleKitchen.
+
+
+
+Each page should include original content, screenshots from your real application, a clear explanation of the problem, relevant features, FAQs and a strong call to action.
+
+Google recommends useful, people-first content, clear page titles and crawlable links—not tricks designed solely to influence rankings. 
+
+Google for Developers
++2
+
+
+
+3. How to get recommended by ChatGPT and Claude
+You cannot directly instruct ChatGPT or Claude to recommend ScaleKitchen to everyone. The practical strategy is to build a credible public presence that their search systems can discover and evaluate.
+Create these trust signals
+- A complete product profile: what ScaleKitchen does, who it serves, its supported workflows, pricing, trial terms and limitations.
+- Independent mentions: relevant business directories, SaaS directories, food-tech publications and genuine reviews.
+- Detailed product documentation: separate pages for customer management, subscription renewals, pending payments, branch managers, delivery operations and analytics.
+- Useful educational content: real examples of how meal subscription businesses operate and solve recurring problems.
+- Consistent brand information: use ScaleKitchen by COSVYN consistently across your website, LinkedIn, YouTube and relevant profiles.
+- Real proof: product screenshots, authentic customer testimonials, demonstrations and measurable case studies when available.
+Do not buy fake reviews, create fake comparisons, or publish hundreds of nearly identical AI-generated articles. These tactics can damage trust and search visibility.
+Test whether AI systems can find you
+Once the website is ready, run these prompts periodically in ChatGPT Search and Claude with web search enabled:
+TEST PROMPT 1
+
+Find software for managing a tiffin service in India, including recurring subscriptions, renewals, pending payments, delivery staff and branch operations. Compare relevant tools with sources.
+  Copy prompt
+TEST PROMPT 2
+
+What software can a meal prep business use to manage daily subscriptions, customer pauses, renewals, kitchen preparation and delivery routes?
+  Copy prompt
+TEST PROMPT 3
+
+Compare ScaleKitchen by COSVYN with other tiffin and meal subscription management systems. Verify its features, pricing and claims from public sources, and explain which businesses it suits.
+  Copy prompt
+Record whether ScaleKitchen appears, which sources are cited, and which competitors appear instead. Repeat monthly to see whether your public presence is improving.
+4. Your 30-day traffic growth plan
+I would prioritize organic discovery and direct outreach before spending heavily on ads.
+Days 1–7
+
+Technical foundation
+- Set up Google Search Console and Google Analytics 4.
+- Check sitemap, robots.txt, indexing, mobile usability and page speed.
+- Make sure ChatGPT and Claude search crawlers can access your public pages.
+- Improve the homepage title, description, messaging and trial CTA.
+
+
+
+Days 8–14
+
+Publish your first search pages
+- Create three high-quality landing pages for tiffin software, meal subscriptions and delivery operations.
+- Publish two practical articles, such as “How to Manage Tiffin Service Subscriptions in Excel” and “How to Reduce Missed Renewals in a Meal Subscription Business.”
+- Add real product screenshots and a demo or trial link.
+
+
+
+Days 15–21
+
+Build external visibility
+- Publish short YouTube demos and LinkedIn posts.
+- Create relevant company profiles and submit ScaleKitchen to suitable SaaS directories.
+- Ask genuine users for feedback and permission to publish testimonials.
+- Share useful answers in relevant food-business and entrepreneur communities without spamming.
+
+
+
+Days 22–30
+
+Measure and improve
+- Check which pages Google has indexed.
+- Track organic clicks, AI referrals, demo bookings and trial registrations.
+- Improve pages that receive impressions but few clicks.
+- Focus the next month's work on the keywords and channels bringing qualified leads.
+
+
+
+These are implementation milestones, not a promise of rankings or traffic within 30 days. SEO and AI visibility can take longer to develop.
+5. Measure actual AI traffic
+Use Google Analytics 4 to track sessions and conversions from referral sources, including chatgpt.com. OpenAI documents that ChatGPT Search referral URLs include utm_source=chatgpt.com, which helps identify traffic from ChatGPT. 
+
+OpenAI Help Center
+
+
+
+
+Track these metrics weekly:
+Metric	What it tells you
+Organic clicks	People arriving from Google
+AI referral sessions	Visitors referred by AI platforms
+Demo bookings	Genuine purchase interest
+Trial registrations	Product interest
+Trial-to-paid conversion	Whether traffic creates revenue
+Cost per qualified lead	Whether paid promotion is worthwhile
+
+For a new SaaS, 100 relevant business-owner visits may be more valuable than 10,000 random visits.
+6. What I would do specifically for ScaleKitchen
+Your strongest marketing angle is not simply that you have meal management software. It is that you help subscription meal businesses manage their entire daily operation in one system.
+
+Use a message along these lines:
+ScaleKitchen by COSVYN — Built for Meal Subscription Businesses
+
+Managing a tiffin service or meal subscription business with spreadsheets, WhatsApp messages and manual payment tracking?
+
+ScaleKitchen brings customer subscriptions, renewals, pending payments, kitchen preparation, delivery operations and branch management into one platform.
+
+Spend less time managing spreadsheets and more time growing your business.
+
+Explore ScaleKitchen and ask us about the free trial.
+
+Website: https://scalekitchen.vercel.app/
+
+
+
+
+Only advertise features and trial terms that are currently available.
+
+One additional growth lever: create a public, ungated interactive calculator for meal subscription business owners to estimate their missed renewals, operational workload or profit margins. A genuinely useful calculator can attract search traffic, earn links and generate qualified leads.
+
+Let's make this practical
+I can help you turn this into a proper SEO and AI visibility implementation plan, but I need to establish which public website should be optimized first.
+1. Which website do you want to optimize?
+
+ScaleKitchen application — scalekitchen.vercel.app
+
+COSVYN website — cosvyn.space
+
+Both websites
+
+
+2. What is your biggest priority?
+
+Get recommended by ChatGPT and Claude
+
+Rank on Google and get organic traffic
+
+Get business-owner leads and trial signups
+
+All three — complete growth strategy
+
+
+3. How is your website built?
+
+Google AI Studio / Gemini-generated code
+
+GitHub repository connected to Vercel
+
+Another setup / not sure
+
+Build my action plan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Create a practical ScaleKitchen by COSVYN website growth and technical audit plan. Websites: ScaleKitchen application only. Main priority: all three priorities. Website setup: Google AI Studio / Gemini-generated code. Include specific technical checks, SEO tasks, AI crawler configuration, content plan, and measurable KPIs. Clearly distinguish verified findings from things still requiring access or inspection.
+
+
+
+
+
+
+
+
+
+
+
+
+
+ScaleKitchen by COSVYN — Website Growth & Technical Audit Plan
+30-day implementation roadmap · Google SEO · ChatGPT & Claude visibility · Qualified leads · Trial conversions
+
+Your objective is to make ScaleKitchen discoverable when meal subscription business owners search Google, ask AI assistants for software recommendations, and look for tools to manage tiffin or meal-prep operations.
+
+My main recommendation: keep your application focused on serving customers, and make its public-facing pages work as a dedicated acquisition channel. If the current application is primarily a JavaScript dashboard, do not assume that adding SEO keywords to its login screen will generate meaningful organic traffic.
+1. Audit status: what is verified and what is not
+Verified from your supplied context
+- ScaleKitchen is a SaaS product for meal subscription businesses.
+- The application URL is https://scalekitchen.vercel.app/.
+- You use Google AI Studio/Gemini-generated code and deploy through Vercel.
+- Your product positioning includes customer plans, renewals, payments, kitchen preparation, delivery operations and branch management.
+
+
+
+Still requires inspection
+
+I have not verified the application's live HTML, source code, Vercel configuration, robots.txt, sitemap, page titles, indexing status, Core Web Vitals, analytics, authentication rules or crawler access. I cannot responsibly mark these as passing or failing without examining them.
+
+
+
+Google's guidance confirms that following SEO best practices makes pages eligible for discovery, but does not guarantee indexing or rankings. 
+
+Google for Developers
++1
+
+
+
+2. Recommended website architecture
+For long-term growth, I recommend eventually using a branded domain such as app.yourdomain.com for the actual software and a public marketing website on the root domain. You already have the COSVYN brand and domain from your earlier setup; the exact domain and DNS configuration should be checked before changing anything.
+Public marketing website
+
+Product pages · Pricing · Blog · Demo · FAQs
+
+Discovery
+
+Google · ChatGPT · Claude
+
+
+Conversion
+
+Demo · Free trial · Signup
+
+
+
+Authenticated ScaleKitchen application
+
+Business dashboards · Customers · Payments · Delivery
+
+
+This separation is a recommendation, not a requirement to rebuild your product immediately. You can start by adding a well-structured public landing page and a few crawlable content pages to your existing deployment, provided the architecture supports them.
+
+Critical security rule: do not make customer dashboards, financial information, invoices, or tenant-specific records public to improve SEO. Protect private routes with authentication and authorization; robots.txt is not a security mechanism.
+3. Technical audit checklist for the existing Vercel application
+Use this as your initial audit register. Mark each item as pass, fail or not tested only after running the check.
+Audit checklist
+0 / 12 passed
+
+
+
+HTTPS and canonical host
+
+The main URL loads securely, and HTTP/www/non-www variants redirect consistently to the chosen host.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+HTTP status and routing
+
+Public pages return 200; unknown URLs return a real 404; deep links work after refresh.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+robots.txt and meta robots
+
+Public pages are crawlable and do not carry accidental noindex directives.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+XML sitemap
+
+The sitemap lists only canonical, public URLs that should be indexed.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Rendered page content
+
+The page title, H1, descriptive copy and links are visible to crawlers—not only after a login or click.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Mobile layout and usability
+
+Test the homepage, signup, forms, pricing and demo flow on mobile.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Core Web Vitals
+
+Measure real and lab performance; target LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1 at the 75th percentile where data is available.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Authentication and tenant isolation
+
+Anonymous users cannot access dashboards, APIs, invoices or another business's records.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+API keys and environment variables
+
+No secret keys are embedded in frontend bundles or committed to Git; privileged operations are server-side.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Signup and demo conversion
+
+All forms validate inputs, handle errors and show successful completion; trial CTA destinations work.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Analytics and conversion events
+
+Measure landing page views, demo requests, signup starts, successful registrations and activated trials.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Deployment and recovery
+
+Preview deploys are tested, production changes are reversible, and backups/restore procedures are documented.
+
+Not tested
+
+Pass
+
+Fail
+
+
+
+Copy audit reportReview results
+
+For performance, use PageSpeed Insights and Chrome UX Report guidance. For indexing, use Google Search Console and its URL Inspection tool. Google's developer guide specifically warns that JavaScript applications may display content to users that Google does not see as expected. 
+
+Google for Developers
++1
+
+
+
+Important checks for Google AI Studio-generated code
+Open the GitHub repository and inspect these files, if present:
+- package.json — identify the actual framework and build scripts.
+- src/ or app/ — inspect routes, page metadata and public page rendering.
+- public/robots.txt and sitemap generation code.
+- vercel.json — inspect redirects, rewrites, headers and caching.
+- .env* files and Git history — verify secrets are not exposed.
+- Authentication middleware and backend API handlers — verify access control.
+Do not change framework settings blindly. First establish whether the project is React/Vite, Next.js or another framework. That determines the correct implementation for SEO metadata, prerendering, routing and sitemap generation.
+4. AI crawler configuration
+Your goal is to permit relevant search crawlers to access public marketing content while keeping authenticated application data private.
+
+OpenAI distinguishes OAI-SearchBot, used for search discovery, from GPTBot, associated with model-training crawling. Their permissions can be configured independently. 
+
+OpenAI Developers
++1
+
+
+
+
+Anthropic similarly distinguishes Claude-SearchBot, Claude-User and ClaudeBot for different uses. 
+
+Claude Help Center
+
+
+
+
+If you choose to allow these crawlers, the following is a starting example for a public marketing site. It is not a verified configuration for your current app.
+
+User-agent: *
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+Sitemap: https://YOUR-PUBLIC-DOMAIN/sitemap.xml
+
+
+
+Replace YOUR-PUBLIC-DOMAIN with the actual canonical domain and publish the file at its root. Preserve any existing rules that are necessary for your application. This example does not grant authenticated access, override a firewall, or guarantee crawling.
+
+If you do not want model-training crawling, decide separately whether to disallow GPTBot and ClaudeBot. Search visibility and training-crawl preferences are separate decisions. Also verify that your hosting provider or firewall is not blocking legitimate crawlers. 
+
+OpenAI Developers
++1
+
+
+
+
+Do not rely on robots.txt to protect private data. Authentication, backend authorization and tenant isolation must enforce that protection.
+5. Google SEO implementation
+Target the right keywords
+Start with specific buyer-intent phrases. These are candidate keywords to research, not verified search-volume estimates.
+Priority	Keyword theme	Page to create
+1	Tiffin service management software	/tiffin-service-management-software
+2	Meal subscription management software	/meal-subscription-software
+3	Meal delivery business software	/meal-delivery-management
+4	Tiffin customer and payment tracking	/tiffin-customer-management
+5	Meal subscription billing and renewals	/subscription-renewal-management
+6	Tiffin business software pricing	/pricing
+
+Create each page only if you can provide distinct, useful content. Avoid making multiple near-identical pages just to target keyword variations.
+Example homepage metadata
+SUGGESTED PAGE TITLE
+
+ScaleKitchen | Meal Subscription Management Software
+
+SUGGESTED META DESCRIPTION
+
+Manage meal subscriptions, customer renewals, pending payments, kitchen preparation and delivery operations with ScaleKitchen by COSVYN. Explore the platform.
+ Copy metadata
+For each public page:
+- Use one clear H1 and descriptive subheadings.
+- Include internal links to related features, pricing and demo pages.
+- Add meaningful image alt text to screenshots.
+- Set a canonical URL and unique page title.
+- Generate an XML sitemap and submit it through Search Console.
+- Use appropriate structured data only when the page genuinely qualifies; do not invent ratings, testimonials or customer counts.
+- Test the page's rendered content and indexing status after deployment.
+These practices align with Google's official SEO Starter Guide and developer SEO guide. 
+
+Google for Developers
++1
+
+
+
+6. Content plan for the first month
+Publish a small number of useful, original pieces grounded in the actual problems your target customers face.
+
+
+
+
+
+
+
+
+
+Article 1 — Week 1
+
+How to Manage a Tiffin Service Without Excel Confusion
+
+Cover recurring plans, daily customer lists, pauses, renewals, payment follow-ups and delivery schedules.
+
+
+
+
+
+
+
+
+
+
+
+
+Article 2 — Week 2
+
+How to Plan Daily Meal Boxes and Delivery Routes
+
+Explain how active subscriptions, delivery-day rules, branch assignments and route planning affect operations.
+
+
+
+
+
+
+
+
+
+
+
+
+Article 3 — Week 3
+
+How to Track Pending Payments and Subscription Renewals
+
+Include a practical tracking template, follow-up workflow and examples of common billing mistakes.
+
+
+
+
+
+
+
+
+
+
+
+
+Article 4 — Week 4
+
+What to Look for in Meal Subscription Management Software
+
+Provide a fair buying checklist covering pricing, trial availability, customer support, security, reporting and delivery operations.
+
+
+
+Each article should link naturally to the relevant ScaleKitchen feature page and demo. Include original screenshots or a video walkthrough wherever possible.
+7. Get qualified traffic from outside Google
+SEO is a long-term channel. For faster feedback, combine it with direct distribution to the audience that needs the product.
+
+YouTube product demonstrations
+
+Publish short, practical videos showing customer renewals, pending payment tracking, daily box preparation and delivery assignments. Link to a relevant feature page, not only the login screen.
+
+
+
+Founder-led outreach
+
+Contact tiffin services, diet meal providers, subscription kitchens and meal-prep businesses. Ask how they currently manage renewals and delivery operations, then offer a relevant demo.
+
+
+
+SaaS directories and partner referrals
+
+Build accurate profiles on suitable software directories and seek partnerships with kitchen consultants, food-business communities and relevant service providers.
+
+
+
+Community participation
+
+Answer genuine questions about subscription operations in relevant entrepreneur and food-business groups. Share useful templates and guides rather than repeatedly posting promotional links.
+
+
+
+Use tracked campaign links for YouTube, outreach, directories and social posts so you can identify which channels produce trial registrations and customers.
+8. Analytics and measurable KPIs
+Install or verify Google Analytics 4 and connect Search Console. Create conversion events for the complete funnel, not just page views.
+Suggested 30-day targets
+These are initial operating targets, not forecasts or guaranteed results. Adjust them after measuring your baseline.
+SEO content
+4
+Useful published articles
+
+
+Landing pages
+3–5
+Distinct buyer-intent pages
+
+
+Distribution
+12+
+Useful videos or social posts
+
+
+Technical quality
+0
+Known critical launch blockers
+
+
+
+
+Track these additional metrics weekly:
+Metric	How to evaluate it
+Indexed public pages	Check Search Console URL Inspection and indexing reports
+Google impressions and clicks	Establish a baseline, then track growth
+AI referral traffic	Track referrals from ChatGPT and other identifiable AI sources
+Qualified leads	Count real meal-business owners who express interest
+Demo-to-trial rate	Trials started ÷ demos completed
+Trial-to-paid rate	Paying customers ÷ trials reaching the end of their evaluation
+Acquisition cost	Marketing and sales spend ÷ new paying customers
+
+For the first month, focus on establishing a trustworthy baseline and fixing technical problems. In subsequent months, compare performance with that baseline. Organic rankings may take longer than 30 days to improve. 
+
+Google for Developers
+
+
+
+9. Copy-paste prompt for Google AI Studio
+Use this prompt with the current codebase available to the AI coding assistant. It instructs the assistant to audit first, preserve existing functionality, and implement changes incrementally.
+ScaleKitchen by COSVYN — SEO, AI Discoverability and Growth Engineering
+Act as a senior full-stack engineer, technical SEO specialist, web security engineer and SaaS growth engineer.
+Project context
+Product: ScaleKitchen by COSVYN
+Current application URL: https://scalekitchen.vercel.app/
+Deployment: Vercel
+Code generation workflow: Google AI Studio / Gemini
+Product audience: Meal subscription businesses, tiffin services, diet-meal providers, meal-prep kitchens and multi-branch food subscription operators.
+
+Product workflows include customer subscriptions, renewals, pending payments, kitchen preparation, daily box planning, delivery assignments, branch operations and business analytics.
+Non-negotiable instructions
+1. Audit the existing repository before modifying code.
+2. Identify the actual framework, routing system, hosting configuration, authentication system, database and deployment architecture.
+3. Produce a report separating VERIFIED FINDINGS, FAILURES, RISKS and NOT TESTED ITEMS.
+4. Never claim to have tested a live service, search engine, crawler or external integration unless the test was actually executed.
+5. Preserve all existing business features, database schemas and working user journeys.
+6. Do not expose tenant data, customer information, invoices, payments, API credentials or private application routes.
+7. Do not introduce fabricated customer testimonials, statistics, ratings, case studies or SEO claims.
+8. Do not replace working authentication or authorization with cosmetic frontend restrictions.
+9. Implement changes in small, reviewable stages and provide a list of changed files and test results after each stage.
+10. Do not deploy breaking changes to production without explicit approval.
+Phase 1 — Technical audit
+Inspect:
+- package.json and build scripts
+- application routes and page rendering
+- public HTML and metadata
+- robots.txt and sitemap
+- Vercel configuration, redirects, rewrites and headers
+- canonical URLs and duplicate routes
+- JavaScript errors, failed network requests and broken links
+- mobile usability, image sizes, loading performance and Core Web Vitals
+- authentication middleware, server-side authorization and tenant isolation
+- environment variables, frontend bundles and accidentally committed secrets
+- form validation, signup workflow and error handling
+Run the available build, lint, type checks and tests. Report actual results and unresolved checks. Never print secret values.
+Phase 2 — Public SEO architecture
+Determine the safest architecture for public marketing pages and the authenticated SaaS application.
+
+Create or improve the following public pages where appropriate:
+- Homepage and product overview
+- Tiffin service management software
+- Meal subscription management software
+- Meal delivery operations
+- Customer subscriptions and renewals
+- Pricing and trial information
+- Product demo
+- FAQ, contact, privacy policy and terms
+Every page must have a unique title, meta description, clear H1, meaningful content, crawlable internal links, appropriate canonical URL and useful calls to action.
+
+Use the existing framework's recommended SEO approach. If server rendering or static generation is supported, use it where appropriate. If the current application is a client-rendered SPA, assess the best low-risk approach before introducing architectural changes.
+
+Do not create thin, duplicate or keyword-stuffed pages.
+Phase 3 — Search engine and AI crawler readiness
+- Create or validate a root-level robots.txt.
+- Create an XML sitemap containing only canonical public pages.
+- Make public marketing content accessible without authentication.
+- Check for accidental noindex directives.
+- Ensure public routes render meaningful content for search engines.
+- Configure crawl permissions for Googlebot, OAI-SearchBot, Claude-SearchBot and Claude-User according to the owner's preferences.
+- Treat GPTBot and ClaudeBot training-crawl permissions as separate decisions.
+- Never expose private APIs or data to crawlers.
+- Do not assume robots.txt alone protects sensitive routes.
+- Document any CDN, firewall, hosting or deployment settings requiring manual configuration.
+Do not promise guaranteed inclusion in Google, ChatGPT or Claude results.
+Phase 4 — Performance and reliability
+Measure performance before making optimizations.
+
+Target Core Web Vitals of LCP ≤2.5 seconds, INP ≤200 milliseconds and CLS ≤0.1 at the 75th percentile where suitable field data exists.
+
+Inspect image optimization, code splitting, unnecessary dependencies, JavaScript bundle size, caching and mobile layout. Preserve existing functionality and validate changes against the baseline.
+Phase 5 — Conversion tracking
+Prepare an analytics implementation plan for:
+- Public landing page views
+- Feature page views
+- Demo button clicks
+- Demo requests
+- Signup starts
+- Successful trial registrations
+- Trial activation
+- Trial-to-paid conversion
+Avoid sending personal, financial or sensitive customer data to analytics tools. Prevent duplicate conversion events and internal traffic contamination where practical.
+Phase 6 — Content and acquisition
+Develop an evidence-based content plan targeting:
+- Tiffin service management software
+- Meal subscription management software
+- Meal delivery business software
+- Customer renewal and payment tracking
+- Meal subscription operations and profitability
+Prioritize helpful, original articles and genuine product demonstrations. Suggest appropriate internal links and directory opportunities. Distinguish keyword hypotheses from verified search-volume data.
+Required deliverables
+A. Repository and technical audit
+B. Prioritized issue register with severity, evidence and recommended fix
+C. Proposed public URL structure
+D. SEO metadata and robots.txt/sitemap implementation
+E. AI crawler configuration notes
+F. Security and regression test results
+G. Analytics event specification
+H. Thirty-day implementation roadmap
+I. Files changed and deployment instructions
+J. Remaining manual verification tasks
+
+Begin with the audit and report. Do not perform a wholesale rewrite. Implement the safest high-impact changes only after the findings and proposed changes have been presented.
+
+
+
+
+10. What I recommend doing first
+Follow this order to avoid spending weeks creating content for a site that may not be technically discoverable:
+1. Open Google Search Console and verify ownership of the current public domain.
+2. Open your Google AI Studio project and identify the framework and repository connected to Vercel.
+3. Run the technical audit and fix any critical security or routing problems first.
+4. Publish the main public product page, three high-intent landing pages, and a valid sitemap.
+5. Start analytics and outreach immediately, then improve SEO and AI visibility using measured results.
+The single most useful next step is to inspect the actual ScaleKitchen source code and live public routes. That will reveal whether the main obstacle is technical discoverability, a lack of public content, weak positioning, or a conversion problem. Those require different fixes, and you should not have to rebuild your SaaS just to improve traffic.

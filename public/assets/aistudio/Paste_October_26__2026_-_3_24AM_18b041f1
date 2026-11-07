@@ -1,0 +1,710 @@
+# ROLE AND RESPONSIBILITY
+
+Act as a Principal Software Architect, Senior Full-Stack Engineer, Database Architect, Application Security Engineer, and Quality Assurance Engineer with extensive experience building production-grade, multi-tenant SaaS applications.
+
+You are working on ScaleKitchen by COSVYN, a subscription meal business management SaaS application.
+
+The application has been developed using Google AI Studio and its existing technology stack.
+
+Your task is to conduct a comprehensive investigation and implement a permanent, production-quality solution for database persistence failures, data synchronization problems, data integrity violations, and inconsistent application state.
+
+This is NOT a request to make a cosmetic frontend fix.
+
+You must identify the actual root causes in the existing codebase, correct them at the appropriate architectural layers, and verify the results through repeatable tests.
+
+Do not assume the application uses Firebase, Firestore, PostgreSQL, Supabase, or any other particular database. First inspect the actual project and identify the technologies currently in use.
+
+Preserve the existing architecture wherever practical. Do not replace working infrastructure or migrate databases unnecessarily.
+
+# PART 1 — INVESTIGATE THE EXISTING PROBLEM
+
+The application currently exhibits the following failures:
+
+1. On the Customers page, deleting a customer makes the customer disappear temporarily.
+2. After refreshing the page, the deleted customer appears again.
+3. Editing a customer and clicking Save appears successful, but the changes disappear after refreshing.
+4. Similar persistence failures may exist elsewhere in the application.
+5. The application may display success notifications without verifying that the corresponding database operation succeeded.
+
+These symptoms suggest that the current implementation may have frontend-only updates, failed database writes, incorrect database operations, stale reads, incorrect record identification, or another persistence-related defect.
+
+These are hypotheses, not confirmed root causes.
+
+Investigate the actual implementation before deciding which explanation is correct.
+
+## Inspect the entire data flow
+
+Trace each affected operation through:
+
+- Frontend components and forms.
+- React state management and context providers, if present.
+- Custom hooks and data-fetching functions.
+- API routes, backend services, or serverless functions, if present.
+- Database client initialization and configuration.
+- Database collections, tables, document structures, and relationships.
+- Database read, create, update, and delete operations.
+- Authentication and authorization.
+- Database security rules and backend access policies.
+- Caching, optimistic updates, subscriptions, and synchronization logic.
+- Error handling and user notifications.
+- Deployment environment variables and production configuration, where accessible.
+
+Identify the exact functions responsible for fetching, creating, updating, deleting, and displaying customer records.
+
+Determine whether the application reads from and writes to the same authoritative database and the correct tenant-specific records.
+
+Look for:
+- Mock data accidentally used in production components.
+- Hardcoded arrays and placeholder records.
+- Local state incorrectly treated as persistent storage.
+- localStorage or sessionStorage used as the authoritative database.
+- Writes that are never awaited.
+- Database errors that are caught and silently ignored.
+- Success notifications shown before operations complete.
+- Incorrect document IDs, primary keys, or tenant identifiers.
+- API calls that return success without verifying the actual operation.
+- Stale cached data or incorrect query invalidation.
+- Database initialization failures.
+- Security rules that reject writes.
+- Duplicate event handlers or conflicting save operations.
+- Race conditions between writes and subsequent reads.
+- Different pages using different data sources for the same entity.
+
+Do not conclude that any of these defects exists until the code or test results support that conclusion.
+
+# PART 2 — ESTABLISH THE DATABASE AS THE SOURCE OF TRUTH
+
+Implement a consistent, reliable persistence architecture using the existing database and technology stack.
+
+The database must be the authoritative source of truth for all persisted business data.
+
+The frontend may maintain temporary UI state, but temporary state must never be mistaken for durable persistence.
+
+Every supported create, update, and delete operation must execute against the authoritative database through the application's appropriate data-access layer.
+
+If the application uses a backend API, route writes through the appropriate authorized backend endpoint unless the existing architecture intentionally and securely supports direct database access.
+
+If the application uses Firebase or Firestore directly, follow the appropriate Firebase SDK patterns, authentication requirements, database rules, and transaction capabilities.
+
+Do not introduce a new backend or database simply to work around an incorrectly implemented existing persistence layer.
+
+## Required write-operation behaviour
+
+For every create, update, or delete operation:
+
+1. Validate the submitted data.
+2. Authenticate the requesting user.
+3. Authorize the requested operation against the user's tenant and permissions.
+4. Identify the correct record using its authoritative database identifier.
+5. Execute the appropriate database operation.
+6. Await the operation's completion.
+7. Handle database errors explicitly.
+8. Verify the resulting state where appropriate.
+9. Return a success response only after the required persistence operation has succeeded.
+10. Update or invalidate the relevant application cache.
+11. Refresh or reconcile the displayed data with the authoritative result.
+12. Display a truthful success or failure notification.
+
+Never return success simply because a button was clicked or React state was updated.
+
+Do not swallow exceptions or convert failed database operations into successful responses.
+
+Use appropriate error messages that help the user understand the failure without exposing sensitive database information.
+
+## Required read-operation behaviour
+
+Every relevant page must load its persisted data from the correct authoritative source.
+
+Implement or repair:
+
+- Initial page loading.
+- Loading indicators.
+- Empty states.
+- Error states and retry behaviour.
+- Refresh and refetch behaviour.
+- Cache invalidation after successful mutations.
+- Correct handling of asynchronous requests.
+- Prevention of stale responses overwriting newer data.
+- Real-time subscriptions where justified by the existing architecture and business requirements.
+
+Do not add real-time listeners indiscriminately. Where listeners are used, manage their lifecycle, unsubscribe when appropriate, and prevent duplicate subscriptions.
+
+After a successful mutation, the user must see the correct persisted state without needing to sign out, clear browser storage, or perform unrelated actions.
+
+A full page refresh must also retrieve the correct persisted state.
+
+# PART 3 — FIX CUSTOMER CRUD OPERATIONS PERMANENTLY
+
+Prioritize the Customers module because its persistence failure is already reproducible.
+
+## A. Create customer
+
+Verify that:
+
+- The submitted customer is written to the database.
+- The correct business tenant is associated with the record.
+- Required fields are validated.
+- Duplicate submissions are prevented where appropriate.
+- The application does not generate duplicate customers after retries.
+- The newly created customer can be retrieved from the database.
+- The customer remains present after refreshing the page.
+- The customer is visible only to authorized users.
+
+## B. Edit customer
+
+Verify that:
+
+- The correct customer ID is used.
+- The update modifies the intended database record.
+- Only authorized, intended fields can be changed.
+- Unmodified fields are preserved.
+- Optional fields and null values are handled correctly.
+- Dates, phone numbers, plan information, branch assignments, and status values are validated.
+- A failed write does not produce a false success notification.
+- The saved values can be retrieved independently after the update.
+- The saved values remain correct after page refresh and a new authenticated session.
+
+Do not replace an entire customer record when a partial update is intended.
+
+Avoid accidental overwriting of concurrent changes. Use version checks, transactions, or another suitable concurrency-control mechanism where necessary.
+
+## C. Delete customer
+
+Verify that:
+
+- The application identifies the correct customer record.
+- The delete operation targets the authoritative database.
+- The operation is authorized for the correct tenant.
+- The application waits for the database operation to finish.
+- The record is absent from subsequent authoritative reads when hard deletion is intended.
+- The record does not reappear after refreshing the page.
+- The record does not reappear after signing out and signing back in.
+- Relevant customer lists, search results, cached data, and dashboard counts are reconciled.
+- A failed delete leaves the UI in a truthful state and communicates the failure.
+
+Inspect the existing data model before choosing between hard deletion, soft deletion, or archival.
+
+Do not hard-delete customers automatically if the customer has associated payments, invoices, delivery history, subscription history, or other records that must be retained for business, financial, or legal reasons.
+
+Where historical records must be preserved, implement an explicit, consistent deletion or archival policy. Ensure archived customers do not incorrectly appear as active customers.
+
+Do not silently delete associated financial records or delivery history.
+
+## D. Pause and resume customer
+
+Verify that pausing or resuming a customer persists the status and any relevant effective dates.
+
+The status must remain correct after page refresh and must be consistently interpreted by the dashboard, customer list, delivery planning, subscription processing, and other affected modules.
+
+# PART 4 — CONDUCT A FULL-APPLICATION DATA INTEGRITY AUDIT
+
+Do not stop after fixing the Customers page.
+
+Identify every module that reads or modifies persisted business data.
+
+At a minimum, audit the following ScaleKitchen modules where they exist in the current application.
+
+## 1. Dashboard
+
+Verify that:
+
+- Revenue figures use persisted transaction data.
+- Active and unique customer counts use consistent definitions.
+- Active subscriptions are counted correctly.
+- Delivery staff counts use authoritative records.
+- Today's packing totals are calculated from the correct active subscriptions and delivery rules.
+- Tomorrow's packing totals use the correct date and business timezone.
+- Plan-wise totals match the underlying records.
+- Branch-wise figures are filtered by the correct tenant and branch.
+- Dashboard figures update after relevant changes.
+
+Avoid maintaining independent, manually updated totals when they can be reliably calculated from authoritative records.
+
+If materialized summaries or cached aggregates are used, implement appropriate synchronization and reconciliation mechanisms.
+
+## 2. Customers and subscriptions
+
+Audit:
+
+- Customer creation, editing, pausing, resuming, archiving, and deletion.
+- Subscription creation and renewal.
+- Start dates and end dates.
+- Remaining subscription days.
+- Plan assignments and plan changes.
+- Branch assignments.
+- Delivery schedules.
+- Active and inactive status.
+- Renewal eligibility and history.
+- Duplicate subscriptions and overlapping subscription periods.
+
+Define consistent business rules for subscription statuses and dates.
+
+Do not assume that changing a customer record automatically updates all related subscription records unless the application explicitly implements and tests that behaviour.
+
+## 3. Payments
+
+Audit:
+
+- Payment creation and updates.
+- Payment status changes.
+- Pending payments.
+- Partial payments.
+- Payment methods.
+- Refunds, where supported.
+- Customer and subscription associations.
+- Duplicate transaction prevention.
+- Revenue totals and payment reports.
+
+Ensure that payment amounts, payment status, and revenue summaries cannot silently contradict one another.
+
+For financial records, use appropriate transaction handling and immutable transaction history where justified.
+
+Do not treat a payment as completed solely because the frontend reports success.
+
+If a payment gateway is integrated, verify the gateway response or webhook using the existing secure integration pattern before treating the payment as confirmed.
+
+Never log or expose secret payment credentials.
+
+## 4. Expenses and financial analytics
+
+Audit:
+
+- Expense creation, editing, and deletion.
+- Expense categories.
+- Branch associations.
+- Expense dates and amounts.
+- Monthly and lifetime totals.
+- Revenue, expenses, profit, and profit-margin calculations.
+- Charts and dashboard summaries.
+
+Verify that financial figures are calculated from the correct persisted records and that date filters, currency handling, and aggregation rules are consistent.
+
+Where a financial mutation affects multiple records, determine whether a database transaction or another consistency mechanism is required.
+
+## 5. Delivery and logistics
+
+Audit:
+
+- Delivery staff records.
+- Staff-to-branch assignments.
+- Customer delivery assignments.
+- Delivery schedules.
+- Daily delivery lists.
+- Route ordering.
+- Delivery status changes.
+- Daily delivery totals.
+- Packing lists.
+- Box allocation and reusable-box tracking, where implemented.
+
+Verify that the delivery page does not display stale customer assignments or incorrect delivery counts after customer, subscription, or staff changes.
+
+## 6. Configuration and master data
+
+Audit:
+
+- States and cities.
+- Branches.
+- Delivery staff.
+- Meal plans and pricing.
+- Plan categories.
+- Delivery days and schedules.
+- Business settings.
+- Other configuration records.
+
+Ensure that changes to master data are saved correctly and that dependent pages retrieve the latest valid configuration.
+
+Preserve referential integrity and validate references to existing branches, plans, and other entities.
+
+## 7. Authentication, tenants, and administration
+
+Audit:
+
+- Business account creation.
+- Tenant identification.
+- User roles and permissions.
+- Business owner access.
+- Branch manager access.
+- Delivery staff access.
+- Super-admin access.
+- Tenant-specific record filtering.
+- User profile updates.
+- Subscription billing for ScaleKitchen itself.
+- Admin analytics and subscription payment records.
+
+Ensure that tenant A cannot read, modify, or delete tenant B's business records.
+
+Never rely solely on a frontend-supplied tenant ID to authorize access.
+
+Enforce tenant boundaries in the appropriate backend authorization layer and database security policies.
+
+Do not weaken database rules to make failing operations work.
+
+Do not expose service-account credentials, API secrets, private environment variables, or privileged database keys in frontend code.
+
+# PART 5 — DATABASE ATOMICITY AND CONSISTENCY
+
+Investigate operations that modify multiple related records.
+
+Atomicity means that a logically indivisible database operation should not leave the system in a partially completed state.
+
+Examples may include:
+
+- Recording a payment and updating related financial records.
+- Renewing a subscription and updating its associated dates and status.
+- Creating a business and its initial configuration.
+- Assigning deliveries and updating related delivery records.
+- Processing a payment webhook and recording the resulting transaction state.
+
+First identify which of these operations actually exist in the application.
+
+Where multiple writes must succeed or fail together, use a database transaction or another suitable atomic mechanism supported by the existing stack.
+
+If the operation spans systems that cannot share a database transaction, implement an appropriate reliable workflow, idempotency mechanism, retry strategy, or reconciliation process.
+
+Do not claim that multiple independent writes are atomic merely because they are executed sequentially.
+
+## Required integrity protections
+
+Inspect and implement appropriate safeguards for:
+
+- Primary keys and unique identifiers.
+- Unique constraints for genuinely unique business records.
+- Foreign-key relationships or equivalent reference validation.
+- Required fields and database-level validation.
+- Valid numeric amounts and date values.
+- Allowed status transitions.
+- Duplicate request prevention.
+- Idempotency for retryable operations.
+- Concurrent updates.
+- Stale writes.
+- Partial failures.
+- Referential integrity.
+- Tenant isolation.
+- Data deletion and archival policies.
+
+Do not add arbitrary unique constraints that conflict with legitimate business operations.
+
+For example, customers may legitimately share names or phone numbers depending on the business rules. Establish the intended uniqueness policy before changing database constraints.
+
+Where supported, enforce critical invariants at the database layer rather than relying exclusively on frontend validation.
+
+Use transactions and concurrency controls appropriate to the actual database. Do not introduce unnecessary complexity.
+
+# PART 6 — HANDLE CACHING AND SYNCHRONIZATION CORRECTLY
+
+Determine whether the application uses React state, a query cache, browser storage, server-side caching, real-time database listeners, or other synchronization mechanisms.
+
+Identify every relevant source of stale data.
+
+For each successful mutation:
+
+1. Update or invalidate the affected cached queries.
+2. Reconcile the displayed record with the authoritative database result.
+3. Update related lists, counts, and summaries.
+4. Ensure a later response cannot overwrite newer data with stale results.
+5. Maintain consistency across relevant open pages or sessions where required.
+
+If optimistic UI updates are used, implement rollback or authoritative reconciliation when a write fails.
+
+Do not implement arbitrary timeouts, forced page reloads, browser-storage clearing, or artificial delays as substitutes for correct synchronization.
+
+Do not use localStorage as a workaround for failed database persistence.
+
+# PART 7 — IMPLEMENT PROPER ERROR HANDLING AND OBSERVABILITY
+
+Provide a consistent error-handling pattern for database operations.
+
+The application must distinguish between:
+
+- Validation errors.
+- Authentication failures.
+- Authorization failures.
+- Missing records.
+- Duplicate records.
+- Database connectivity problems.
+- Constraint violations.
+- Transaction failures.
+- Unexpected application errors.
+
+Where appropriate, log operational errors with sufficient context to investigate them.
+
+Logs must not contain passwords, access tokens, payment secrets, or unnecessary personal information.
+
+Do not expose raw database errors to ordinary users.
+
+The UI should show a clear success message only when the operation succeeds. Otherwise, it should communicate that the change was not saved and preserve recoverable form input when appropriate.
+
+Avoid duplicate submissions while a mutation is in progress.
+
+Ensure that a failed operation does not leave the UI permanently stuck in a loading state.
+
+# PART 8 — VERIFY THE IMPLEMENTATION THROUGH AUTOMATED TESTS
+
+Do not consider this task complete merely because the code compiles or the page looks correct.
+
+Create or update automated tests using the testing framework already present in the project.
+
+If no appropriate testing framework exists, determine the smallest practical addition that fits the current stack.
+
+## A. Customer persistence tests
+
+Test the following sequence:
+
+1. Create a test customer using a unique test identifier.
+2. Verify that the customer exists in the authoritative database.
+3. Fetch the customer through the application's normal read path.
+4. Update one or more fields.
+5. Verify that the database contains the updated values.
+6. Fetch the customer again independently.
+7. Verify that the updated values remain correct.
+8. Delete or archive the customer according to the application's policy.
+9. Query the authoritative source again.
+10. Verify that the record is absent from active customer results when appropriate.
+11. Simulate a page reload or repeat the normal data-fetching operation.
+12. Verify that the deleted customer does not reappear in the active customer list.
+
+Use isolated test data and a safe test environment.
+
+Do not delete real customer records or modify production data as part of automated tests.
+
+## B. Negative-path tests
+
+Verify that:
+
+- A rejected database write does not produce a success notification.
+- An unauthorized user cannot update another tenant's records.
+- A failed delete does not falsely remove the record from the authoritative view.
+- A nonexistent customer produces an appropriate result.
+- Duplicate submissions do not create unintended duplicate records.
+- Invalid data is rejected.
+- Network failures are handled correctly.
+- Concurrent updates do not silently overwrite newer information when conflict protection is required.
+
+## C. Cross-module regression tests
+
+For each module that modifies persisted data, test the relevant create, read, update, and delete operations.
+
+Where deletion is intentionally prohibited, verify the correct archival or status-change workflow instead.
+
+Test financial and subscription workflows end to end where practical.
+
+Verify that dashboards and reports reflect the authoritative underlying data.
+
+## D. Persistence across sessions
+
+Where authentication and the test environment permit, verify that:
+
+- A mutation survives a page refresh.
+- The persisted record survives navigation away from and back to the page.
+- The record remains correct after signing out and signing back in.
+- Another authorized session can retrieve the updated data.
+- Relevant real-time views update as intended.
+
+Use a fresh read or new authenticated session to verify persistence rather than trusting the same component's local state.
+
+# PART 9 — DATA RECONCILIATION AND EXISTING DATA
+
+Investigate whether the current implementation has created inconsistencies between displayed data, persisted records, and related business records.
+
+Determine whether there are:
+
+- Duplicate customers.
+- Missing references.
+- Orphaned records.
+- Duplicate payment transactions.
+- Incorrect subscription dates.
+- Invalid status combinations.
+- Inconsistent totals.
+- Archived records appearing as active.
+- Incorrect branch associations.
+- Records belonging to the wrong tenant.
+- Other demonstrable integrity violations.
+
+Do not assume these issues exist without evidence.
+
+Create a safe reconciliation plan.
+
+Before running any repair against existing data:
+
+1. Identify the exact inconsistency.
+2. Determine its root cause.
+3. Define the expected correct state.
+4. Assess the risk of modifying the affected records.
+5. Back up or otherwise protect affected data.
+6. Make the smallest justified correction.
+7. Verify the result independently.
+8. Record what was changed.
+
+Never delete records merely because they appear duplicated without checking their business meaning and associated history.
+
+Never silently modify real financial records to make dashboard totals match.
+
+Do not run destructive migrations or bulk cleanup scripts against production without explicit authorization and a recoverable backup.
+
+If production data access is unavailable, prepare the reconciliation procedure and clearly state what remains unverified.
+
+# PART 10 — IMPLEMENTATION RULES
+
+Follow these rules throughout the repair.
+
+1. Inspect the existing code before editing it.
+2. Identify the actual database and persistence architecture.
+3. Trace the root cause of the customer deletion and editing failures.
+4. Make the smallest set of architectural changes that fully fixes the underlying defect.
+5. Fix shared data-access functions where appropriate rather than adding separate patches to every page.
+6. Preserve existing features, UI design, routes, and working business logic.
+7. Do not remove working functionality to make tests pass.
+8. Do not replace the existing database without a demonstrated technical need.
+9. Do not fabricate successful database responses.
+10. Do not introduce mock data into production data paths.
+11. Do not suppress database errors.
+12. Do not disable security rules or tenant checks.
+13. Do not hardcode production credentials.
+14. Do not claim a test passed unless it was actually executed.
+15. Do not claim production behaviour is verified when only local code has been inspected.
+16. Do not make broad destructive changes without a backup and an appropriate migration plan.
+17. Follow the existing project's coding conventions and established architecture.
+18. Keep the implementation maintainable and testable.
+19. Ensure all changes are compatible with the actual deployment environment.
+20. Fix root causes rather than adding superficial workarounds.
+
+If a required environment variable, database permission, external service, or deployment configuration is inaccessible, explain the limitation and provide the exact next step required.
+
+# PART 11 — REQUIRED EXECUTION ORDER
+
+Execute the work in this order.
+
+PHASE 1: INVESTIGATION
+
+- Inspect the project structure.
+- Identify the frontend, backend, database, and authentication mechanisms.
+- Trace customer creation, editing, deletion, and data fetching.
+- Reproduce or otherwise verify the reported failure.
+- Document the root cause with the relevant files and functions.
+
+PHASE 2: ROOT-CAUSE REPAIR
+
+- Correct the shared persistence implementation.
+- Fix customer create, edit, delete, and pause operations.
+- Correct error handling.
+- Correct cache invalidation and data fetching.
+- Ensure that authoritative database state drives the displayed results.
+
+PHASE 3: FULL-APPLICATION AUDIT
+
+- Identify all modules that read or modify business data.
+- Inspect their persistence and synchronization implementations.
+- Identify demonstrable integrity risks.
+- Correct the confirmed defects without breaking existing workflows.
+
+PHASE 4: DATABASE INTEGRITY
+
+- Inspect constraints and relationships.
+- Correct inappropriate write patterns.
+- Add suitable validation, uniqueness, concurrency controls, and transactions where justified.
+- Verify tenant isolation and authorization.
+
+PHASE 5: AUTOMATED TESTING
+
+- Run the customer persistence tests.
+- Run negative-path tests.
+- Run relevant cross-module regression tests.
+- Run available type checks, linting, and build commands.
+- Resolve regressions caused by the changes.
+
+PHASE 6: FINAL VERIFICATION
+
+- Verify that customer updates survive independent reads and page refreshes.
+- Verify that deleted or archived customers do not reappear in active customer lists.
+- Verify that failed writes do not generate false success messages.
+- Verify that related modules remain consistent.
+- Identify any issues that could not be tested because of environmental limitations.
+
+Do not stop after Phase 2.
+
+# PART 12 — REQUIRED FINAL REPORT
+
+When implementation is complete, provide a factual engineering report containing the following sections.
+
+## A. Root cause
+
+Explain exactly why the customer deletion and editing operations were failing.
+
+Identify the relevant files, functions, and database operations.
+
+Distinguish verified causes from suspected causes.
+
+## B. Changes implemented
+
+List every relevant file modified and explain the change made.
+
+Identify any database rules, schema changes, migrations, indexes, or backend endpoints modified.
+
+Explain how the changes fix the underlying persistence problem.
+
+## C. Full-system audit
+
+Provide a table with these columns:
+
+- Module.
+- Operation audited.
+- Issue identified.
+- Fix implemented.
+- Verification performed.
+- Final status.
+
+Include every relevant module inspected.
+
+## D. Test results
+
+Report the actual results of:
+
+- Customer creation persistence.
+- Customer update persistence.
+- Customer deletion or archival persistence.
+- Page-refresh verification.
+- Session-persistence verification.
+- Failed-write handling.
+- Tenant-isolation testing.
+- Related financial and subscription tests.
+- Build and type checks.
+
+For each test, state PASS, FAIL, BLOCKED, or NOT RUN.
+
+Do not mark a test PASS unless it was actually executed and the observed result supports that conclusion.
+
+## E. Remaining risks
+
+List any unverified areas, deployment dependencies, database access limitations, security concerns, or unresolved issues.
+
+Clearly distinguish a local development test from a successful production verification.
+
+## F. Deployment instructions
+
+Explain exactly what needs to be deployed, which migrations or database-rule updates are required, which environment variables need verification, and how to validate the deployed application safely.
+
+Do not expose secret values.
+
+## G. Final completion assessment
+
+State whether the work is:
+
+- Implemented and locally tested.
+- Implemented and integration-tested.
+- Deployed and production-verified.
+- Partially implemented.
+- Blocked by missing access or infrastructure.
+
+Use only the status supported by actual evidence.
+
+# FINAL DIRECTIVE
+
+Begin by inspecting the actual ScaleKitchen codebase and tracing the failing customer operations.
+
+Do not immediately generate replacement components or rewrite the entire application.
+
+Find the real root cause, fix the underlying persistence and synchronization architecture, audit the other data-modifying modules, implement appropriate integrity protections, and run the tests.
+
+The objective is a reliable, secure, maintainable SaaS application in which successful data changes persist correctly, failed operations are reported honestly, and related business records remain consistent.
+
+Start with Phase 1 and continue through all phases that can be completed safely with the available project access.

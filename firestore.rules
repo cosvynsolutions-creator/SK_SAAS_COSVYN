@@ -1,0 +1,512 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // =========================================================================
+    // SCALEKITCHEN PHASE 2: HARDENED MULTI-TENANT SECURITY RULES
+    // =========================================================================
+    // Key principles:
+    // 1. Browser NEVER directly modifies subscription, payments, or sensitive tenant data
+    // 2. Drivers and Managers authenticate via callable, receive custom token with claims
+    // 3. All tenant data scoped by businessId; custom claims enforce per-request access
+    // 4. Plaintext data (PINs, passwords) never leave Cloud Functions
+    // =========================================================================
+
+    // =========================================================================
+    // HELPER FUNCTIONS
+    // =========================================================================
+
+    // 1. Super Admin check: email verified + explicit admin claim OR hardcoded list
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token != null && (
+               ('admin' in request.auth.token && request.auth.token.admin == true) ||
+               (
+                 'email_verified' in request.auth.token && 
+                 request.auth.token.email_verified == true &&
+                 'email' in request.auth.token && (
+                   request.auth.token.email.lower() == 'cosvynsolutions@gmail.com' || 
+                   request.auth.token.email.lower() == 'admin@scalekitchen.in' ||
+                   request.auth.token.email.lower() == 'memosmy10@gmail.com'
+                 )
+               )
+             );
+    }
+
+    // 2. Business Owner check: uid == businessId
+    function isOwner(bizId) {
+      return request.auth != null && request.auth.uid == bizId;
+    }
+
+    // 3. Delivery Driver check: custom token claim validates role + bizId
+    //    Driver can only act within their assigned business
+    function isTenantDriver(bizId) {
+      return request.auth != null && 
+             request.auth.token != null &&
+             'role' in request.auth.token && 
+             request.auth.token.role == 'driver' &&
+             'bizId' in request.auth.token && 
+             request.auth.token.bizId == bizId;
+    }
+
+    // 4. Branch Manager check: custom token claim validates role + bizId
+    //    Manager can only act within their assigned business
+    function isTenantManager(bizId) {
+      return request.auth != null && 
+             request.auth.token != null &&
+             'role' in request.auth.token && 
+             request.auth.token.role == 'manager' &&
+             'bizId' in request.auth.token && 
+             request.auth.token.bizId == bizId;
+    }
+
+    // 5. Manager All-Branches check: manager with 'All' branch scope
+    function isAllBranchManager(bizId) {
+      return isTenantManager(bizId) && 
+             'branchId' in request.auth.token && 
+             request.auth.token.branchId == 'All';
+    }
+
+    // 6. Manager Branch Authorized check: matches assigned branch or manager has 'All'
+    function isBranchAuthorized(targetBranchId) {
+      return 'branchId' in request.auth.token && 
+             (request.auth.token.branchId == 'All' || request.auth.token.branchId == targetBranchId);
+    }
+
+    // =========================================================================
+    // PUBLIC / GLOBAL SYSTEM COLLECTIONS
+    // =========================================================================
+
+    // Pricing & Global Configuration (READ-ONLY for everyone)
+    match /global_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // System broadcast messages (logged-in users only)
+    match /admin_messages/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Rate limits (server-side Cloud Functions only)
+    match /auth_rate_limits/{docId} {
+      allow read, write: if false;
+    }
+
+    // Driver Auth Lookup (Server-side Cloud Functions only, NO client access)
+    match /driver_auth_lookup/{mobileDigits} {
+      allow read, write: if false;
+    }
+
+    // Driver Auth Lookup by Email (Server-side Cloud Functions only, NO client access)
+    match /driver_auth_lookup_email/{email} {
+      allow read, write: if false;
+    }
+
+    // Driver Private Profiles (Authenticated delivery partners can read their own profile; owner/admin can read)
+    match /driver_profiles/{driverUid} {
+      allow read: if request.auth != null && (
+        request.auth.uid == driverUid || 
+        isAdmin() ||
+        (resource.data != null && 'bizId' in resource.data && isOwner(resource.data.bizId))
+      );
+      allow write: if false;
+    }
+
+    // Free Trial Claim Registry (server-side only)
+    match /trial_claims/{claimKey} {
+      allow read, write: if false;
+    }
+
+    // Pending Subscriber Activations (server-side only)
+    match /pending_activations/{email} {
+      allow read, write: if false;
+    }
+
+    // Global Feature Requests (logged-in users only, no driver prefix)
+    match /global_features/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                       request.resource.data.tenantId == request.auth.uid;
+      allow update, delete: if isAdmin() || 
+                            (request.auth != null && 
+                             resource.data.tenantId == request.auth.uid);
+    }
+
+    // Global Support Tickets
+    match /global_tickets/{docId} {
+      allow read: if isAdmin() || 
+                     (request.auth != null && resource.data.tenantId == request.auth.uid);
+      allow create: if request.auth != null && 
+                       request.resource.data.tenantId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Global Reviews (logged-in users)
+    match /global_reviews/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                       request.resource.data.tenantId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // PHASE 3: PAYMENT ORDERS & SECRETS (Cloud Functions Admin SDK ONLY)
+    // Browser can NEVER read or write these directly
+    // =========================================================================
+
+    match /orders/{orderId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    match /processed_payments/{paymentId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    match /gemini_rate_limits/{uid} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    // =========================================================================
+    // MULTI-TENANT BUSINESS DATA (Core: /businesses/{userId}/*)
+    // =========================================================================
+
+    match /businesses/{userId} {
+      // Business root profile: owner can read/write, drivers/managers can read only
+      allow get: if isOwner(userId) || 
+                    isTenantDriver(userId) || 
+                    isTenantManager(userId) || 
+                    isAdmin();
+      allow list: if isAdmin();
+      
+      // Owner can create their own business
+      allow create: if isOwner(userId) || isAdmin();
+      
+      // Owner delete
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // Owner update with strict anti-tampering rules
+      allow update: if isAdmin() || (
+        isOwner(userId) && (
+          // A. Free Trial: one-time claim only
+          (
+            request.resource.data.planName == 'Free Trial' &&
+            (!('trialClaimed' in resource.data) || resource.data.trialClaimed != true) &&
+            (!('trialStartDate' in resource.data) || resource.data.trialStartDate == null) &&
+            request.resource.data.trialClaimed == true
+          ) ||
+          // B. Mark as Expired (server scheduler does this, but owner can too)
+          (
+            request.resource.data.planStatus == 'Expired' &&
+            request.resource.data.planStatus != resource.data.planStatus
+          ) ||
+          // C. Safe profile updates (no plan or payment fields can be modified)
+          (
+            !('planExpiryDate' in request.resource.data.keys()) &&
+            !('planStatus' in request.resource.data.keys()) &&
+            !('planName' in request.resource.data.keys()) &&
+            !('lastPaymentId' in request.resource.data.keys()) &&
+            !('trialClaimed' in request.resource.data.keys()) &&
+            !('purchasedInvoiceCredits' in request.resource.data.keys())
+          )
+        )
+      );
+
+      // --- Staff Subcollection (Delivery Partners) ---
+      match /staff/{staffId} {
+        // Owner and drivers can read; managers can read drivers belonging to their branch
+        allow read: if isOwner(userId) || 
+                       isAdmin() ||
+                       isTenantDriver(userId) || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || isBranchAuthorized(resource.data.branchId)));
+        
+        // Owner can create/delete; manager can only create/delete staff assigned to their branch
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        
+        allow update: if isOwner(userId) || isAdmin() ||
+          (
+            isTenantManager(userId) && 
+            (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId))
+          ) ||
+          (
+            isTenantDriver(userId) && 
+            'staffId' in request.auth.token && 
+            request.auth.token.staffId == staffId &&
+            // Drivers can ONLY update location, status, and attendance (never PIN or name)
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'currentLat', 'currentLng', 'lastLocationUpdate',
+              'lastAttendanceDate', 'attendanceMarkedAt', 'batteryLevel', 'updatedAt'
+            ])
+          );
+      }
+
+      // --- Staff Credentials Subcollection (Server-side Cloud Functions only) ---
+      match /staff_credentials/{staffId} {
+        allow read, write: if false;
+      }
+
+      // --- Customers Subcollection (Subscribers) ---
+      match /customers/{customerId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (
+                         isTenantDriver(userId) && 
+                         (!('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == '' || isBranchAuthorized(resource.data.branchId))
+                       ) ||
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        
+        allow update: if isOwner(userId) || isAdmin() ||
+          (
+            isTenantManager(userId) && 
+            (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId))
+          ) ||
+          (
+            isTenantDriver(userId) &&
+            // Drivers can only update box collection tracking, NOT customer details
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'boxCollections', 'uncollectedBoxesCount', 'updatedAt', 'routeOrder',
+              'lastDeliveryDate', 'nextDeliveryDate'
+            ])
+          );
+      }
+
+      // --- Delivery Logs Subcollection ---
+      match /delivery_logs/{logId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == request.auth.token.branchId));
+        
+        // Owner, drivers, and branch managers can write delivery updates
+        allow create, update: if isOwner(userId) || 
+                                 isAdmin() || 
+                                 isTenantDriver(userId) || 
+                                 (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in request.resource.data) || request.resource.data.branchId == request.auth.token.branchId));
+        
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // --- Driver Manifest (per-driver route for the day) ---
+      match /driver_manifest/{staffId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       isTenantManager(userId);
+        
+        allow write: if isOwner(userId) || isAdmin() || isTenantManager(userId);
+      }
+
+      // --- Driver Status (real-time: online/offline, GPS, battery) ---
+      match /driver_status/{staffId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       isTenantManager(userId);
+        
+        // Driver updates their own status; owner/manager can reset
+        allow write: if isOwner(userId) || isAdmin() || isTenantManager(userId) ||
+          (
+            isTenantDriver(userId) && 
+            'staffId' in request.auth.token && 
+            request.auth.token.staffId == staffId
+          );
+      }
+
+      // --- Driver Sessions (shift start/end logs) ---
+      match /driver_sessions/{sessionId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       isTenantManager(userId);
+        
+        allow write: if isOwner(userId) || isAdmin() || isTenantManager(userId) || isTenantDriver(userId);
+      }
+
+      // --- Branch Managers ---
+      match /managers/{managerId} {
+        allow read: if isOwner(userId) || isAdmin() || (isTenantManager(userId) && request.auth.token.managerId == managerId);
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // --- Manager Audit Logs ---
+      match /manager_logs/{logId} {
+        allow read: if isOwner(userId) || isAdmin() || (isTenantManager(userId) && resource.data.managerId == request.auth.token.managerId);
+        // Managers can record their own login/logout sessions without forgery
+        allow create: if isOwner(userId) || isAdmin() ||
+          (
+            isTenantManager(userId) && 
+            request.resource.data.managerId == request.auth.token.managerId
+          );
+        allow update: if isOwner(userId) || isAdmin() ||
+          (
+            isTenantManager(userId) && 
+            resource.data.managerId == request.auth.token.managerId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['logoutTime', 'status', 'updatedAt'])
+          );
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // --- Meal Plans ---
+      match /plans/{planId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == 'All' || resource.data.branchId == request.auth.token.branchId));
+        allow write: if isOwner(userId) || 
+                        isAdmin() || 
+                        (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+      }
+
+      // --- Kitchen Branches ---
+      match /branches/{branchId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       isTenantDriver(userId) || 
+                       isTenantManager(userId);
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // --- Reusable Box Types ---
+      match /box_types/{boxId} {
+        allow read: if isOwner(userId) || isAdmin() || isTenantManager(userId);
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // --- Financial & Operational (strictly least privilege) ---
+      // Invoices: Manager can read records matching their branch; NEVER write
+      match /invoices/{invoiceId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == request.auth.token.branchId));
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // Payments: Manager can read records matching their branch; NEVER write
+      match /payments/{paymentId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == request.auth.token.branchId));
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      match /billing_history/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false; // Server only
+      }
+
+      // Expenses: Branch managers can read, create, update, delete for their branch only
+      match /expenses/{expenseId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow update: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId)));
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+      }
+
+      // Inventory: Branch managers can read, create, update, delete for their branch only
+      match /inventory/{itemId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow update: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId)));
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+      }
+
+      // Notes: Branch managers can read, create, update, delete for their branch
+      match /notes/{noteId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == 'All' || resource.data.branchId == request.auth.token.branchId));
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow update: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId)));
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+      }
+
+      // Single Orders: Branch managers can read, create, update, delete for their branch
+      match /single_orders/{orderId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+        allow create: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow update: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || (resource.data.branchId == request.auth.token.branchId && request.resource.data.branchId == resource.data.branchId)));
+        allow delete: if isOwner(userId) || 
+                         isAdmin() || 
+                         (isTenantManager(userId) && (isAllBranchManager(userId) || resource.data.branchId == request.auth.token.branchId));
+      }
+
+      // Broadcasts: Customer/rider operational notices
+      match /broadcasts/{broadcastId} {
+        allow read: if isOwner(userId) || 
+                       isAdmin() || 
+                       (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in resource.data) || resource.data.branchId == null || resource.data.branchId == 'All' || resource.data.branchId == request.auth.token.branchId));
+        allow create, update: if isOwner(userId) || 
+                                 isAdmin() || 
+                                 (isTenantManager(userId) && (isAllBranchManager(userId) || request.resource.data.branchId == request.auth.token.branchId));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Catch-all for other subcollections (deny by default)
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // =========================================================================
+    // COLLECTION GROUPS (Analytics & lookup by role)
+    // =========================================================================
+    
+    // Billing history: admins see all, owners see their own
+    match /{path=**}/billing_history/{docId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == path[1]);
+    }
+
+    // Payment records: admins see all, owners see their own
+    match /{path=**}/payments/{docId} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == path[1]);
+    }
+
+    // Staff lookup by mobile (no direct reads except via driverLogin callable)
+    match /{path=**}/staff/{staffId} {
+      allow read: if false; // Server only
+    }
+
+  }
+}
