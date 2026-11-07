@@ -2,7 +2,6 @@ import React, { useState, useEffect, ErrorInfo, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { FeatureAnnouncementModal } from './components/FeatureAnnouncementModal';
-import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import OnboardingPayment from './pages/OnboardingPayment';
@@ -19,35 +18,15 @@ import Payments from './pages/Payments';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
 import Deliveries from './pages/Deliveries';
-import DriverPortal from './pages/DriverPortal';
-import ManagerPortal from './pages/ManagerPortal';
 import Inventory from './pages/Inventory';
 import Messages from './pages/Messages';
-import AdminLayout from './layouts/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminPayments from './pages/admin/AdminPayments';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminFeatureSupport from './pages/admin/AdminFeatureSupport';
-import AdminProfile from './pages/admin/AdminProfile';
-import AdminPlans from './pages/admin/AdminPlans';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminMessages from './pages/admin/AdminMessages';
-import AdminInvoiceCredits from './pages/admin/AdminInvoiceCredits';
-
-// Legal Pages
-import Terms from './pages/legal/Terms';
-import Privacy from './pages/legal/Privacy';
-import Shipping from './pages/legal/Shipping';
-import Refunds from './pages/legal/Refunds';
-import Contact from './pages/legal/Contact';
 
 import { 
   Menu, X, Zap, LogOut, Bell, AlertTriangle, Loader2, User, CheckCircle, Phone, MapPin, ArrowRight, MessageSquare
 } from 'lucide-react';
 import { getDaysDifference, calculateRemainingDeliveries, getCustomerActiveDaysLeft } from './services/store';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ADMIN_EMAIL, isAdminEmail } from './services/adminStore';
+import { isAdminEmail } from './services/adminStore';
 import { doc, onSnapshot, updateDoc, getDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { useStreamCollection, recordOwnerDailyLogin, syncBusinessLiveStats } from './services/dbService';
@@ -103,6 +82,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return this.props.children;
   }
 }
+
+const ExternalRedirect = ({ url }: { url: string }) => {
+  useEffect(() => {
+    window.location.replace(url);
+  }, [url]);
+
+  return null;
+};
 
 // --- SUBSCRIPTION MANAGER ---
 const SubscriptionManager = () => {
@@ -254,18 +241,20 @@ const ProtectedRoute = () => {
     return <div className="h-screen w-full flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-primary-600" size={40} /></div>;
   }
   
-  if (currentUser?.email && isAdminEmail(currentUser.email)) return <Navigate to="/admin/dashboard" replace />;
+  if (currentUser?.email && isAdminEmail(currentUser.email)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
+        <p className="text-slate-700">This account uses the admin app.</p>
+        <a className="font-bold text-primary-600 hover:underline" href={import.meta.env.VITE_ADMIN_APP_URL}>
+          Open the admin app
+        </a>
+      </div>
+    );
+  }
   if (!currentUser) return <Navigate to="/login" replace />;
   if (hasActivePlan === false) return <Navigate to="/onboarding" replace />;
   
   return <AppLayout businessData={businessData} />;
-};
-
-const AdminRoute = () => {
-  const { currentUser, loading } = useAuth();
-  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-white" size={40} /></div>;
-  if (currentUser && isAdminEmail(currentUser.email)) return <AdminLayout />;
-  return <Navigate to="/admin/login" replace />;
 };
 
 const AppLayout = ({ businessData }: { businessData?: any }) => {
@@ -585,18 +574,17 @@ const App = () => {
         <HashRouter>
           <SubscriptionManager />
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/onboarding" element={<OnboardingPayment />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/shipping" element={<Shipping />} />
-            <Route path="/refunds" element={<Refunds />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/driver" element={<DriverPortal />} />
-            <Route path="/manager" element={<ManagerPortal />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/terms" element={<ExternalRedirect url={`${import.meta.env.VITE_LANDING_URL}/#/terms`} />} />
+            <Route path="/privacy" element={<ExternalRedirect url={`${import.meta.env.VITE_LANDING_URL}/#/privacy`} />} />
+            <Route path="/shipping" element={<ExternalRedirect url={`${import.meta.env.VITE_LANDING_URL}/#/shipping`} />} />
+            <Route path="/refunds" element={<ExternalRedirect url={`${import.meta.env.VITE_LANDING_URL}/#/refunds`} />} />
+            <Route path="/contact" element={<ExternalRedirect url={`${import.meta.env.VITE_LANDING_URL}/#/contact`} />} />
+            <Route path="/driver" element={<ExternalRedirect url={import.meta.env.VITE_DELIVERY_APP_URL} />} />
+            <Route path="/manager" element={<ExternalRedirect url={import.meta.env.VITE_MANAGER_APP_URL} />} />
             <Route path="/app" element={<ProtectedRoute />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
@@ -614,18 +602,6 @@ const App = () => {
               <Route path="support" element={<Support />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
-            </Route>
-            <Route path="/admin" element={<AdminRoute />}>
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="payments" element={<AdminPayments />} />
-              <Route path="plans" element={<AdminPlans />} />
-              <Route path="analytics" element={<AdminAnalytics />} />
-              <Route path="feature-support" element={<AdminFeatureSupport />} />
-              <Route path="messages" element={<AdminMessages />} />
-              <Route path="invoice-credits" element={<AdminInvoiceCredits />} />
-              <Route path="profile" element={<AdminProfile />} />
-              <Route index element={<Navigate to="dashboard" replace />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

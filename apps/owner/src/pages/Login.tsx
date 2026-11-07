@@ -5,7 +5,7 @@ import { Zap, CheckCircle, Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { ADMIN_EMAIL, isAdminEmail } from '../services/adminStore';
+import { isAdminEmail } from '../services/adminStore';
 import { recordOwnerDailyLogin } from '../services/dbService';
 
 const Login = () => {
@@ -16,6 +16,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasPendingSubscription, setHasPendingSubscription] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
 
   useEffect(() => {
     const pending = localStorage.getItem('pending_subscription');
@@ -26,7 +27,7 @@ const Login = () => {
 
   const handleAuthSuccess = async (user: any) => {
     if (isAdminEmail(user.email)) {
-      navigate('/admin/dashboard');
+      setIsAdminUser(true);
       return;
     }
 
@@ -165,6 +166,15 @@ const Login = () => {
               <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm font-medium border border-red-100 mb-6 flex items-start gap-3 shadow-sm">
                 <AlertCircle size={18} className="shrink-0 mt-0.5" /> 
                 <span className="leading-snug">{error}</span>
+              </div>
+            )}
+
+            {isAdminUser && (
+              <div className="mb-6 rounded-xl border border-primary-200 bg-primary-50 p-4 text-center text-sm text-slate-700">
+                This account uses the admin app.{' '}
+                <a className="font-bold text-primary-700 hover:underline" href={import.meta.env.VITE_ADMIN_APP_URL}>
+                  Continue to the admin app
+                </a>
               </div>
             )}
 
