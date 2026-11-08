@@ -157,7 +157,7 @@ export const getDriverAppShareMessage = (
     `${boyUrl}\n\n` +
     `📱 *Steps:*\n` +
     `1. Open link on your phone browser\n` +
-    `2. Enter your registered mobile number and your security PIN\n` +
+    `2. Sign in with the email address and password configured by your kitchen owner\n` +
     `3. Punch In to activate live route tracking and view today's meal stops!\n\n` +
     `Have a safe delivery ride!`
   );

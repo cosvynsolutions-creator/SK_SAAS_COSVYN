@@ -131,7 +131,9 @@ export interface DeliveryBoyStaff {
   mobile: string;
   branchId?: string;
   role?: string;
-  status?: 'Online' | 'Offline' | 'On Delivery';
+  status?: 'Online' | 'Offline' | 'On Delivery' | 'Active' | 'Inactive';
+  active?: boolean;
+  isDeleted?: boolean;
   lastAttendanceDate?: string;
   attendanceMarkedAt?: string;
   currentLat?: number;
@@ -143,7 +145,6 @@ export interface DeliveryBoyStaff {
   homeLocation?: string;
   salary?: number;
   dateOfJoining?: string;
-  pin?: string;
 }
 
 /**
@@ -443,40 +444,6 @@ export const getTodayStr = (): string => {
 export const normalizePhone = (phone: string): string => {
   const digits = (phone || '').replace(/\D/g, '');
   return digits.slice(-10);
-};
-
-/**
- * Decodes a secure driver token into connection parameters.
- * SECURITY: Never extracts or yields a PIN from tokens. PIN is verified separately.
- */
-export const decodeDriverToken = (token: string): { 
-  bizId: string; 
-  boyId?: string; 
-  mobile?: string; 
-  pin?: string; 
-  name?: string; 
-} | null => {
-  if (!token) return null;
-  try {
-    let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) {
-      base64 += '=';
-    }
-    const json = decodeURIComponent(atob(base64));
-    const parsed = JSON.parse(json);
-    if (parsed && parsed.b) {
-      return {
-        bizId: parsed.b,
-        boyId: parsed.s || undefined,
-        mobile: parsed.m || undefined,
-        pin: undefined,
-        name: parsed.n || undefined
-      };
-    }
-  } catch (e) {
-    console.warn("Could not decode driver token:", e);
-  }
-  return null;
 };
 
 /**

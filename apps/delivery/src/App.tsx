@@ -7,7 +7,7 @@ import {
   Lock, Key, Eye, EyeOff, LogOut, Mail
 } from 'lucide-react';
 import { 
-  collection, doc, updateDoc, setDoc, getDoc, onSnapshot 
+  collection, doc, updateDoc, setDoc, getDoc, onSnapshot, query, where
 } from 'firebase/firestore';
 import { 
   auth, db, driverLoginCallable, getDriverClaims,
@@ -17,262 +17,26 @@ import {
   getTodayStr, isCustomerDeliveryDay2Plus, REUSABLE_BOX_TYPES, 
   BoxRecollectionStatus, DeliveryBoyStaff, GlobalCustomer, SubscribedPlan,
   getCustomerScheduledPlansForSession, isPlanActiveOnDate, formatDateDDMMYYYY,
-  decodeDriverToken, normalizePhone, isReusableBoxType,
+  isReusableBoxType,
   getDefaultMealSessionForTime, MealSession, getPlanDietOnDate, DietType
 } from './services/driverStore';
 import { buildWhatsAppUrl, getDeliveryArrivalMessage } from './services/whatsapp';
 
-// Sample demo data for instant preview or offline testing
-const DEMO_STAFF: DeliveryBoyStaff[] = [
-  {
-    id: 'demo-rider-1',
-    name: 'Raju Express',
-    mobile: '9876543210',
-    branchId: 'main-hub',
-    role: 'Delivery Boy',
-    status: 'Online',
-    currentLat: 12.9716,
-    currentLng: 77.5946,
-    lastLocationUpdate: new Date().toISOString(),
-    lastAttendanceDate: getTodayStr(),
-    attendanceMarkedAt: '08:30 AM'
-  },
-  {
-    id: 'demo-rider-2',
-    name: 'Amit Kumar',
-    mobile: '9812345678',
-    branchId: 'main-hub',
-    role: 'Delivery Boy',
-    status: 'Offline',
-    lastAttendanceDate: '',
-    attendanceMarkedAt: ''
-  }
-];
-
-const DEMO_CUSTOMERS: GlobalCustomer[] = [
-  {
-    id: 'demo-cust-1',
-    name: 'Rahul Verma',
-    mobile: '9845012345',
-    address: 'Flat 402, Green Glen Towers, Outer Ring Road, Bellandur',
-    area: 'Bellandur',
-    branchId: 'main-hub',
-    deliveryBoyId: 'demo-rider-1',
-    deliveryBoyName: 'Raju Express',
-    routeOrder: 1,
-    isActive: true,
-    createdAt: '2026-09-01T08:00:00.000Z',
-    planId: 'p-lunch-deluxe',
-    mealTime: ['Lunch'],
-    startDate: '2026-09-01',
-    endDate: '2026-10-31',
-    daysLeft: 37,
-    paymentStatus: 'Paid',
-    amountPaid: 3200,
-    planPrice: 3200,
-    deliveryCharges: 0,
-    pendingAmount: 0,
-    renewalCount: 1,
-    reusableBoxEnabled: true,
-    reusableBoxType: '3-Tier Stainless Steel Tiffin',
-    uncollectedBoxesCount: 1,
-    activePlans: [
-      {
-        planId: 'p-lunch-deluxe',
-        planName: 'Deluxe Healthy Lunch',
-        mealTime: 'Lunch',
-        startDate: '2026-09-01',
-        endDate: '2026-10-31',
-        price: 3200,
-        pauses: [],
-        weekdays: [0, 1, 2, 3, 4, 5, 6],
-        reusableBoxType: '3-Tier Stainless Steel Tiffin'
-      }
-    ]
-  },
-  {
-    id: 'demo-cust-2',
-    name: 'Pooja Hegde',
-    mobile: '9741098765',
-    address: 'Villa 18, Palm Meadows Phase 2, Whitefield',
-    area: 'Whitefield',
-    branchId: 'main-hub',
-    deliveryBoyId: 'demo-rider-1',
-    deliveryBoyName: 'Raju Express',
-    routeOrder: 2,
-    isActive: true,
-    createdAt: '2026-09-05T08:00:00.000Z',
-    planId: 'p-lunch-deluxe',
-    mealTime: ['Lunch'],
-    startDate: '2026-09-05',
-    endDate: '2026-10-31',
-    daysLeft: 37,
-    paymentStatus: 'Paid',
-    amountPaid: 3200,
-    planPrice: 3200,
-    deliveryCharges: 0,
-    pendingAmount: 0,
-    renewalCount: 0,
-    reusableBoxEnabled: true,
-    reusableBoxType: 'Insulated Hot-Box 4-Container',
-    uncollectedBoxesCount: 2,
-    activePlans: [
-      {
-        planId: 'p-lunch-deluxe',
-        planName: 'Deluxe Healthy Lunch',
-        mealTime: 'Lunch',
-        startDate: '2026-09-05',
-        endDate: '2026-10-31',
-        price: 3200,
-        pauses: [],
-        weekdays: [0, 1, 2, 3, 4, 5, 6],
-        reusableBoxType: 'Insulated Hot-Box 4-Container'
-      }
-    ]
-  },
-  {
-    id: 'demo-cust-3',
-    name: 'Vikram Malhotra',
-    mobile: '9980123456',
-    address: '#104, Sunrise Residency, Kadubeesanahalli',
-    area: 'Kadubeesanahalli',
-    branchId: 'main-hub',
-    deliveryBoyId: 'demo-rider-1',
-    deliveryBoyName: 'Raju Express',
-    routeOrder: 3,
-    isActive: true,
-    createdAt: '2026-09-10T08:00:00.000Z',
-    planId: 'p-lunch-eco',
-    mealTime: ['Lunch'],
-    startDate: '2026-09-10',
-    endDate: '2026-10-31',
-    daysLeft: 37,
-    paymentStatus: 'Paid',
-    amountPaid: 2400,
-    planPrice: 2400,
-    deliveryCharges: 0,
-    pendingAmount: 0,
-    renewalCount: 0,
-    reusableBoxEnabled: false,
-    reusableBoxType: 'None',
-    uncollectedBoxesCount: 0,
-    activePlans: [
-      {
-        planId: 'p-lunch-eco',
-        planName: 'Standard Homestyle Lunch',
-        mealTime: 'Lunch',
-        startDate: '2026-09-10',
-        endDate: '2026-10-31',
-        price: 2400,
-        pauses: [],
-        weekdays: [0, 1, 2, 3, 4, 5, 6],
-        reusableBoxType: 'None'
-      }
-    ]
-  }
-];
-
-// Safe storage helpers for Safari Private Browsing and cross-browser reliability
-const safeStorageGet = (key: string): string => {
-  if (typeof window === 'undefined') return '';
-  try {
-    return localStorage.getItem(key) || sessionStorage.getItem(key) || '';
-  } catch {
-    return '';
-  }
-};
-
-const safeStorageSet = (key: string, val: string) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, val);
-  } catch {}
-  try {
-    sessionStorage.setItem(key, val);
-  } catch {}
-};
-
 export const App: React.FC = () => {
-  // Read params from URL or localStorage across all mobile and desktop browsers
-  const getParam = (key: string) => {
-    if (typeof window === 'undefined') return '';
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      let val = searchParams.get(key);
-      if (val) return val;
-
-      const hash = window.location.hash || '';
-      if (hash.includes('?')) {
-        const hashQuery = hash.substring(hash.indexOf('?') + 1);
-        const hashParams = new URLSearchParams(hashQuery);
-        val = hashParams.get(key);
-        if (val) return val;
-      }
-
-      // Regex fallback across full href for unusual redirect/WhatsApp URL formats
-      const href = window.location.href || '';
-      const match = href.match(new RegExp(`[?&]${key}=([^&#]*)`));
-      if (match && match[1]) {
-        return decodeURIComponent(match[1]);
-      }
-      return '';
-    } catch {
-      return '';
-    }
-  };
-
-  // Decode secure obfuscated token if present
-  const token = getParam('auth') || getParam('k') || getParam('token');
-  const decoded = token ? decodeDriverToken(token) : null;
-
-  // Persist URL parameters immediately so the mobile session persists across reloads
-  if (decoded) {
-    if (decoded.bizId) safeStorageSet('driver_biz_id', decoded.bizId);
-    if (decoded.boyId) safeStorageSet('driver_boy_id', decoded.boyId);
-    if (decoded.mobile) safeStorageSet('driver_phone', decoded.mobile);
-    if (decoded.name) safeStorageSet('driver_name', decoded.name);
-  }
-  const urlBiz = getParam('biz');
-  if (urlBiz) safeStorageSet('driver_biz_id', urlBiz);
-  const urlBoy = getParam('boy');
-  if (urlBoy) safeStorageSet('driver_boy_id', urlBoy);
-  const urlPhone = getParam('phone');
-  if (urlPhone) safeStorageSet('driver_phone', urlPhone);
-
-  const initialBiz = decoded?.bizId || 
-                     urlBiz || 
-                     safeStorageGet('driver_biz_id') || '';
-  const initialBoy = decoded?.boyId || urlBoy || safeStorageGet('driver_boy_id') || '';
-  const initialPhone = decoded?.mobile || urlPhone || safeStorageGet('driver_phone') || '';
-  const initialName = decoded?.name || safeStorageGet('driver_name') || safeStorageGet('driver_token_name') || '';
-
-  const [bizId, setBizId] = useState<string>(initialBiz);
-  const [selectedBoyId, setSelectedBoyId] = useState<string>(initialBoy);
-  const [driverDisplayName, setDriverDisplayName] = useState<string>(initialName);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(initialBiz === 'demo');
-
-  const sessionExpires = Number(safeStorageGet('driver_session_expires') || 0);
-  const isSessionValid = !sessionExpires || sessionExpires > Date.now();
-  const isDriverLoggedIn = Boolean(safeStorageGet('driver_is_logged_in') === 'true' && isSessionValid);
-
+  const [bizId, setBizId] = useState<string>('');
+  const [selectedBoyId, setSelectedBoyId] = useState<string>('');
+  const [driverBranchId, setDriverBranchId] = useState<string>('');
+  const [driverDisplayName, setDriverDisplayName] = useState<string>('');
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [emailInput, setEmailInput] = useState<string>(() => safeStorageGet('driver_email') || '');
+  const [emailInput, setEmailInput] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [phoneInput, setPhoneInput] = useState<string>(initialPhone);
   const [verifying, setVerifying] = useState<boolean>(false);
-
-  // If driver has an active authenticated session, close login modal; otherwise prompt for Email + Password
-  const [loginModalOpen, setLoginModalOpen] = useState<boolean>(() => {
-    if (initialBiz === 'demo') return false;
-    if (initialBoy && isDriverLoggedIn) return false;
-    return true;
-  });
-
+  const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
+  const [authInitializing, setAuthInitializing] = useState<boolean>(true);
   const [selectedMeal, setSelectedMeal] = useState<MealSession>(() => getDefaultMealSessionForTime());
   const [isDriverMealManuallySelected, setIsDriverMealManuallySelected] = useState<boolean>(false);
 
-  // Auto-update meal session on time boundary crossing if driver hasn't manually overridden it
   useEffect(() => {
     const checkTime = () => {
       if (!isDriverMealManuallySelected) {
@@ -292,377 +56,335 @@ export const App: React.FC = () => {
   const [businessName, setBusinessName] = useState<string>('ScaleKitchen');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [routeErrors, setRouteErrors] = useState<Record<string, boolean>>({});
+  const routeError = Object.values(routeErrors).some(Boolean)
+    ? 'Cannot load route. Check your connection and try again.'
+    : null;
 
-  // Shift & Attendance state
   const todayStr = getTodayStr();
-  const hasLocalActiveShift = safeStorageGet('driver_shift_active') === 'true' && safeStorageGet('driver_shift_date') === todayStr;
-  const [isShiftActive, setIsShiftActive] = useState<boolean>(hasLocalActiveShift);
-  const [punchInTime, setPunchInTime] = useState<string | null>(() => {
-    if (hasLocalActiveShift) return safeStorageGet('driver_punch_in_time') || null;
-    return null;
-  });
+  const [isShiftActive, setIsShiftActive] = useState<boolean>(false);
+  const [punchInTime, setPunchInTime] = useState<string | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const currentCoordsRef = useRef(currentCoords);
   const [activeBoxModal, setActiveBoxModal] = useState<{ customer: GlobalCustomer; logKey: string } | null>(null);
   const [selectedBoxStatus, setSelectedBoxStatus] = useState<BoxRecollectionStatus>('Collected');
   const [boxNotes, setBoxNotes] = useState('');
-  const [showAllUnassigned, setShowAllUnassigned] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
   const [highlightedStopId, setHighlightedStopId] = useState<string | null>(null);
 
-  const showToast = (msg: string, stopId?: string) => {
+  const showToast = (msg: string, stopId?: string, retry?: () => void) => {
     setToastMessage(msg);
+    setRetryAction(retry || null);
     if (stopId) setHighlightedStopId(stopId);
     setTimeout(() => {
       setToastMessage(null);
+      setRetryAction(null);
       if (stopId) setHighlightedStopId(null);
-    }, 4500);
+    }, 8000);
   };
 
   const watchIdRef = useRef<number | null>(null);
 
-  // ZERO URL EXPOSURE: Clean query parameters from address bar immediately after reading
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const hasSearch = Boolean(window.location.search);
-        const hasHashQuery = window.location.hash.includes('?');
-        if (hasSearch || hasHashQuery) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-      } catch (e) {
-        console.warn("Could not clean driver address bar URL:", e);
-      }
-    }
-  }, []);
-
-  // Listen to Auth State on the isolated Delivery App
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const claims = await getDriverClaims(user);
-          let targetBizId = claims?.bizId || '';
-          let targetStaffId = claims?.staffId || '';
-          let targetBranchId = claims?.branchId || '';
+      if (!user) {
+        setBizId('');
+        setSelectedBoyId('');
+        setDriverBranchId('');
+        setDriverDisplayName('');
+        setAllStaff([]);
+        setCustomers([]);
+        setPlans([]);
+        setBranches([]);
+        setDeliveryLogs({});
+        setRouteErrors({});
+        setIsShiftActive(false);
+        setPunchInTime(null);
+        setAuthInitializing(false);
+        setLoading(false);
+        return;
+      }
 
-          // Fetch driver profile from driver_profiles/{user.uid}
-          try {
-            const profileSnap = await getDoc(doc(db, 'driver_profiles', user.uid));
-            if (profileSnap.exists()) {
-              const p = profileSnap.data();
-              if (p.active === false || p.status === 'Inactive') {
-                await signOut(auth);
-                safeStorageSet('driver_is_logged_in', 'false');
-                setLoginError('This delivery partner account has been deactivated. Please contact your kitchen manager.');
-                setLoginModalOpen(true);
-                return;
-              }
-              if (!targetBizId && p.bizId) targetBizId = p.bizId;
-              if (!targetStaffId && p.staffId) targetStaffId = p.staffId;
-              if (!targetBranchId && p.branchId) targetBranchId = p.branchId;
-              if (p.name) {
-                setDriverDisplayName(p.name);
-                safeStorageSet('driver_name', p.name);
-              }
-              if (p.email) safeStorageSet('driver_email', p.email);
-              if (p.mobile) safeStorageSet('driver_phone', p.mobile);
-            }
-          } catch (profileErr) {
-            console.warn("Could not load driver_profiles:", profileErr);
-          }
-
-          if (targetBizId) {
-            setBizId(targetBizId);
-            safeStorageSet('driver_biz_id', targetBizId);
-          }
-          if (targetStaffId) {
-            setSelectedBoyId(targetStaffId);
-            safeStorageSet('driver_boy_id', targetStaffId);
-          }
-          if (targetBranchId) {
-            safeStorageSet('driver_branch_id', targetBranchId);
-          }
-
-          if (targetBizId && targetStaffId) {
-            safeStorageSet('driver_is_logged_in', 'true');
-            setLoginModalOpen(false);
-            setLoginError(null);
-          }
-        } catch (err: any) {
-          console.warn("Auth state restoration error:", err);
+      setLoading(true);
+      try {
+        const claims = await getDriverClaims(user);
+        if (claims?.role !== 'driver' || !claims.bizId || !claims.staffId) {
+          await signOut(auth);
+          setLoginError('This account is not authorized as a delivery partner. Please use the email and password provided by your kitchen owner.');
+          return;
         }
-      } else {
-        if (!isDemoMode) {
-          safeStorageSet('driver_is_logged_in', 'false');
+
+        const profileSnap = await getDoc(doc(db, 'driver_profiles', user.uid));
+        if (profileSnap.exists() && profileSnap.data().active === false) {
+          await signOut(auth);
+          setLoginError('This delivery partner account has been deactivated. Please contact your kitchen owner.');
+          return;
         }
+
+        setBizId(claims.bizId);
+        setSelectedBoyId(claims.staffId);
+        setDriverBranchId(claims.branchId || '');
+        setDriverDisplayName(user.displayName || '');
+        setLoginError(null);
+        setLoginModalOpen(false);
+      } catch (error) {
+        console.error('Unable to verify delivery partner identity:', error);
+        await signOut(auth);
+        setLoginError('Unable to verify your delivery account. Check your connection and try again.');
+      } finally {
+        setAuthInitializing(false);
+        setLoading(false);
       }
     });
 
     return () => unsub();
-  }, [bizId, selectedBoyId, isDemoMode]);
+  }, []);
 
-  // Sync to storage
+  // Subscribe only to the authenticated driver's staff record and route data.
   useEffect(() => {
-    if (bizId) safeStorageSet('driver_biz_id', bizId);
-    if (selectedBoyId) safeStorageSet('driver_boy_id', selectedBoyId);
-  }, [bizId, selectedBoyId]);
+    if (!bizId || !selectedBoyId) return;
 
-  // Load Demo Data if in demo mode
-  const launchDemoMode = () => {
-    setIsDemoMode(true);
-    setBizId('demo');
-    setAllStaff(DEMO_STAFF);
-    setSelectedBoyId(DEMO_STAFF[0].id);
-    setCustomers(DEMO_CUSTOMERS);
-    setSelectedMeal('Lunch');
-    setIsShiftActive(true);
-    setPunchInTime('08:30 AM');
-    setLoginModalOpen(false);
-    setLoading(false);
-  };
+    const onRouteError = (source: string, error: Error) => {
+      console.error('Cannot load route:', error);
+      setRouteErrors(prev => ({ ...prev, [source]: true }));
+    };
+    const onRouteSuccess = (source: string) => {
+      setRouteErrors(prev => ({ ...prev, [source]: false }));
+    };
 
-  // Subscribe to Firestore streams of the authenticated business
-  useEffect(() => {
-    if (!bizId) {
-      setLoading(false);
-      return;
-    }
-
-    if (bizId === 'demo') {
-      launchDemoMode();
-      return;
-    }
-
-    // 1. Staff subcollection stream
-    const staffRef = collection(db, 'businesses', bizId, 'staff');
-    const unsubscribeStaff = onSnapshot(staffRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as DeliveryBoyStaff[];
-      if (list.length > 0) {
-        setAllStaff(list);
-        
-        if (selectedBoyId) {
-          const found = list.find(s => s.id === selectedBoyId || s.name === selectedBoyId);
-          if (found) {
-            const hasLocalShift = safeStorageGet('driver_shift_active') === 'true' && safeStorageGet('driver_shift_date') === todayStr;
-            const isOnlineInDb = found.status === 'Online' && found.lastAttendanceDate === todayStr;
-            setIsShiftActive(isOnlineInDb || hasLocalShift);
-            if (found.attendanceMarkedAt) {
-              setPunchInTime(found.attendanceMarkedAt);
-            } else if (hasLocalShift && safeStorageGet('driver_punch_in_time')) {
-              setPunchInTime(safeStorageGet('driver_punch_in_time'));
-            }
-
-            // Enforce account deactivation
-            if ((found.status as string) === 'Inactive' || (found as any).isDeleted) {
-              safeStorageSet('driver_is_logged_in', 'false');
-              safeStorageSet('driver_session_expires', '0');
-              setLoginError("This delivery partner account has been deactivated by the kitchen manager.");
-              setLoginModalOpen(true);
-            }
-          }
+    const unsubscribeStaff = onSnapshot(
+      doc(db, 'businesses', bizId, 'staff', selectedBoyId),
+      async (snap) => {
+        if (!snap.exists()) {
+          onRouteError('staff', new Error('Delivery partner staff record is missing.'));
+          return;
         }
-      }
-      setLoading(false);
-    }, (err) => {
-      console.warn("Direct staff stream notice:", err?.message);
-      setLoading(false);
-    });
-
-    // 2. Customers subcollection stream
-    const custRef = collection(db, 'businesses', bizId, 'customers');
-    const unsubscribeCust = onSnapshot(custRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as GlobalCustomer[];
-      if (list.length > 0) setCustomers(list);
-    }, (err) => console.warn("Direct customer stream notice:", err?.message));
-
-    // 3. Plans stream
-    const plansRef = collection(db, 'businesses', bizId, 'plans');
-    const unsubscribePlans = onSnapshot(plansRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (list.length > 0) setPlans(list);
-    }, (err) => console.warn("Direct plans stream notice:", err?.message));
-
-    // 4. Branches stream
-    const branchesRef = collection(db, 'businesses', bizId, 'branches');
-    const unsubscribeBranches = onSnapshot(branchesRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (list.length > 0) setBranches(list);
-    }, (err) => console.warn("Direct branches stream notice:", err?.message));
-
-    // 5. Today's delivery logs stream
-    const logsRef = collection(db, 'businesses', bizId, 'delivery_logs');
-    const unsubscribeLogs = onSnapshot(logsRef, (snap) => {
-      const map: Record<string, any> = {};
-      snap.docs.forEach(d => {
-        const data = d.data();
-        if (data.date === todayStr) {
-          map[`${data.customerId}_${data.mealTime}`] = { id: d.id, ...data };
+        const staff = { id: snap.id, ...snap.data() } as DeliveryBoyStaff;
+        setAllStaff([staff]);
+        onRouteSuccess('staff');
+        if (staff.name) setDriverDisplayName(staff.name);
+        if (staff.status === 'Inactive' || staff.active === false || staff.isDeleted) {
+          await signOut(auth);
+          setLoginError('This delivery partner account has been deactivated. Please contact your kitchen owner.');
+          return;
         }
-      });
-      setDeliveryLogs(prev => ({ ...prev, ...map }));
-    }, (err) => console.warn("Direct logs stream notice:", err?.message));
+        const shiftActive = staff.status === 'Online' && staff.lastAttendanceDate === todayStr;
+        setIsShiftActive(shiftActive);
+        setPunchInTime(shiftActive ? staff.attendanceMarkedAt || null : null);
+      },
+      error => onRouteError('staff', error)
+    );
 
-    // 6. Business profile stream for branding & logo
-    const bizDocRef = doc(db, 'businesses', bizId);
-    const unsubscribeBiz = onSnapshot(bizDocRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.businessName) setBusinessName(data.businessName);
-        if (data.logoUrl) setLogoUrl(data.logoUrl);
-      }
-    }, (err) => console.warn("Driver biz profile err:", err?.message));
-
-    // 7. Driver Manifest stream
-    let unsubscribeManifest = () => {};
-    if (selectedBoyId) {
-      const manifestDocRef = doc(db, 'businesses', bizId, 'driver_manifest', selectedBoyId);
-      unsubscribeManifest = onSnapshot(manifestDocRef, (snap) => {
+    const customersRef = collection(db, 'businesses', bizId, 'customers');
+    const customerRoute = driverBranchId
+      ? query(customersRef, where('branchId', '==', driverBranchId))
+      : customersRef;
+    const unsubscribeCust = onSnapshot(
+      customerRoute,
+      (snap) => {
+        onRouteSuccess('customers');
+        setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })) as GlobalCustomer[]);
+      },
+      error => onRouteError('customers', error)
+    );
+    const unsubscribePlans = onSnapshot(
+      collection(db, 'businesses', bizId, 'plans'),
+      (snap) => {
+        onRouteSuccess('plans');
+        setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      },
+      error => onRouteError('plans', error)
+    );
+    const unsubscribeBranches = onSnapshot(
+      collection(db, 'businesses', bizId, 'branches'),
+      (snap) => {
+        onRouteSuccess('branches');
+        setBranches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      },
+      error => onRouteError('branches', error)
+    );
+    const unsubscribeLogs = onSnapshot(
+      collection(db, 'businesses', bizId, 'delivery_logs'),
+      (snap) => {
+        onRouteSuccess('delivery logs');
+        const map: Record<string, any> = {};
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (data.date === todayStr) map[`${data.customerId}_${data.mealTime}`] = { id: d.id, ...data };
+        });
+        setDeliveryLogs(map);
+      },
+      error => onRouteError('delivery logs', error)
+    );
+    const unsubscribeBiz = onSnapshot(
+      doc(db, 'businesses', bizId),
+      (snap) => {
+        onRouteSuccess('business');
         if (snap.exists()) {
           const data = snap.data();
-          if (Array.isArray(data.customers) && data.customers.length > 0) setCustomers(data.customers);
-          if (Array.isArray(data.plans) && data.plans.length > 0) setPlans(data.plans);
-          if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
-          if (data.businessName) setBusinessName(data.businessName);
-          if (data.logoUrl) setLogoUrl(data.logoUrl);
-          setLoading(false);
+          setBusinessName(data.businessName || 'ScaleKitchen');
+          setLogoUrl(data.logoUrl || '');
         }
-      }, (err) => console.warn("Driver manifest stream notice:", err?.message));
-    }
-
-    // 8. Driver Status stream
-    let unsubscribeStatus = () => {};
-    if (selectedBoyId) {
-      const statusDocRef = doc(db, 'businesses', bizId, 'driver_status', selectedBoyId);
-      unsubscribeStatus = onSnapshot(statusDocRef, (snap) => {
-        if (snap.exists()) {
-          const sData = snap.data();
-          if (sData.lastAttendanceDate === todayStr && sData.status === 'Online') {
-            setIsShiftActive(true);
-            if (sData.attendanceMarkedAt) setPunchInTime(sData.attendanceMarkedAt);
-          } else if (sData.status === 'Offline') {
-            const hasLocalShift = safeStorageGet('driver_shift_active') === 'true' && safeStorageGet('driver_shift_date') === todayStr;
-            if (!hasLocalShift) {
-              setIsShiftActive(false);
-            }
-          }
-        }
-      }, () => {});
-    }
+      },
+      error => onRouteError('business', error)
+    );
+    const unsubscribeManifest = onSnapshot(
+      doc(db, 'businesses', bizId, 'driver_manifest', selectedBoyId),
+      (snap) => {
+        onRouteSuccess('manifest');
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (Array.isArray(data.customers)) setCustomers(data.customers);
+        if (Array.isArray(data.plans)) setPlans(data.plans);
+        if (Array.isArray(data.branches)) setBranches(data.branches);
+        if (data.businessName) setBusinessName(data.businessName);
+        if (data.logoUrl) setLogoUrl(data.logoUrl);
+      },
+      error => onRouteError('manifest', error)
+    );
+    const unsubscribeStatus = onSnapshot(
+      doc(db, 'businesses', bizId, 'driver_status', selectedBoyId),
+      (snap) => {
+        onRouteSuccess('status');
+        if (!snap.exists()) return;
+        const status = snap.data();
+        const shiftActive = status.lastAttendanceDate === todayStr && status.status === 'Online';
+        setIsShiftActive(shiftActive);
+        setPunchInTime(shiftActive ? status.attendanceMarkedAt || null : null);
+      },
+      error => onRouteError('status', error)
+    );
 
     return () => {
-      unsubscribeBiz();
       unsubscribeStaff();
       unsubscribeCust();
       unsubscribePlans();
       unsubscribeBranches();
       unsubscribeLogs();
+      unsubscribeBiz();
       unsubscribeManifest();
       unsubscribeStatus();
     };
-  }, [bizId, selectedBoyId, todayStr]);
+  }, [bizId, selectedBoyId, driverBranchId, todayStr]);
 
   // GPS Watcher when shift is active
   useEffect(() => {
-    if (isShiftActive && navigator.geolocation) {
-      let lastWrittenMs = 0;
+    if (!isShiftActive || !navigator.geolocation || !bizId || !selectedBoyId) return;
+    let lastWrittenMs = 0;
 
-      const updateLocation = (pos: GeolocationPosition) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        setCurrentCoords({ lat: latitude, lng: longitude });
-        setGpsError(null);
+    const updateLocation = async (pos: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      const previousCoords = currentCoordsRef.current;
+      const coords = { lat: latitude, lng: longitude };
+      currentCoordsRef.current = coords;
+      setCurrentCoords(coords);
+      setGpsError(null);
 
-        const nowMs = Date.now();
-        // Throttle Firestore writes to at most once per 10 seconds
-        if (nowMs - lastWrittenMs < 10000) {
-          return;
-        }
-        lastWrittenMs = nowMs;
+      const nowMs = Date.now();
+      if (nowMs - lastWrittenMs < 10000) return;
+      lastWrittenMs = nowMs;
 
-        // SAFE DEMO CHECK: Do not write GPS to production Firestore in demo mode
-        if (bizId && bizId !== 'demo' && selectedBoyId) {
-          const locPayload = {
+      const now = new Date().toISOString();
+      const statusPayload = {
+        staffId: selectedBoyId,
+        deliveryBoyId: selectedBoyId,
+        currentLat: latitude,
+        currentLng: longitude,
+        accuracy: accuracy || null,
+        lastLocationUpdate: now,
+        status: 'Online',
+        isShiftActive: true,
+        updatedAt: now
+      };
+
+      try {
+        await Promise.all([
+          setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), statusPayload, { merge: true }),
+          updateDoc(doc(db, 'businesses', bizId, 'staff', selectedBoyId), {
             currentLat: latitude,
             currentLng: longitude,
-            accuracy: accuracy || null,
-            lastLocationUpdate: new Date().toISOString(),
+            lastLocationUpdate: now,
             status: 'Online',
-            isShiftActive: true,
-            updatedAt: new Date().toISOString()
-          };
+            updatedAt: now
+          })
+        ]);
+      } catch (error) {
+        console.error('GPS location sync failed:', error);
+        lastWrittenMs = 0;
+        currentCoordsRef.current = previousCoords;
+        setCurrentCoords(previousCoords);
+        showToast('Could not save your GPS location. Try again.', undefined, () => {
+          void updateLocation(pos);
+        });
+      }
+    };
 
-          setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), locPayload, { merge: true })
-            .catch(err => console.warn("Driver status GPS sync err:", err));
+    const retryCurrentLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        position => { void updateLocation(position); },
+        error => {
+          setGpsError(error.message);
+          showToast('Could not get your location. Check location permission and try again.', undefined, retryCurrentLocation);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+      );
+    };
 
-          const boyDocRef = doc(db, 'businesses', bizId, 'staff', selectedBoyId);
-          updateDoc(boyDocRef, {
-            currentLat: latitude,
-            currentLng: longitude,
-            lastLocationUpdate: new Date().toISOString(),
-            status: 'Online',
-            updatedAt: new Date().toISOString()
-          }).catch(err => console.warn("Staff GPS update err:", err));
-        }
-      };
+    navigator.geolocation.getCurrentPosition(
+      position => { void updateLocation(position); },
+      error => {
+        setGpsError(error.message);
+        showToast('Could not get your location. Check location permission and try again.', undefined, retryCurrentLocation);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      position => { void updateLocation(position); },
+      error => {
+        setGpsError(error.message);
+        showToast('Could not get your location. Check location permission and try again.', undefined, retryCurrentLocation);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
 
-      const handleError = (err: GeolocationPositionError) => {
-        setGpsError(err.message);
-      };
-
-      navigator.geolocation.getCurrentPosition(updateLocation, handleError, { enableHighAccuracy: true });
-      watchIdRef.current = navigator.geolocation.watchPosition(updateLocation, handleError, {
-        enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 20000
-      });
-
-      return () => {
-        if (watchIdRef.current !== null) {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-        }
-      };
-    }
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
   }, [isShiftActive, bizId, selectedBoyId]);
 
-  // Safely sync driver display name when staff list loads
+  // Sync display details from the authenticated driver's staff record.
   useEffect(() => {
-    if (!selectedBoyId && !driverDisplayName) return;
-    const fromStaff = allStaff.find(s => 
-      s.id === selectedBoyId || 
-      (selectedBoyId && s.id?.toLowerCase() === selectedBoyId.toLowerCase()) ||
-      (driverDisplayName && s.name?.toLowerCase() === driverDisplayName.toLowerCase())
-    );
+    if (!selectedBoyId) return;
+    const fromStaff = allStaff.find(s => s.id === selectedBoyId);
     if (fromStaff?.name && fromStaff.name !== driverDisplayName) {
       setDriverDisplayName(fromStaff.name);
-      safeStorageSet('driver_name', fromStaff.name);
     }
   }, [allStaff, selectedBoyId, driverDisplayName]);
 
   // Active delivery boy & their branch hub
   const currentBoy = useMemo(() => {
-    const fromStaff = allStaff.find(s => 
-      s.id === selectedBoyId || 
-      (selectedBoyId && s.id?.toLowerCase() === selectedBoyId.toLowerCase()) ||
-      (driverDisplayName && s.name?.toLowerCase() === driverDisplayName.toLowerCase())
-    );
+    const fromStaff = allStaff.find(s => s.id === selectedBoyId);
     if (fromStaff) return fromStaff;
 
-    const name = driverDisplayName || safeStorageGet('driver_name') || safeStorageGet('driver_token_name');
-    if (selectedBoyId || name) {
+    if (selectedBoyId) {
       return {
-        id: selectedBoyId || safeStorageGet('driver_boy_id') || 'driver-1',
-        name: name || 'Delivery Partner',
-        mobile: phoneInput || safeStorageGet('driver_phone') || '',
+        id: selectedBoyId,
+        name: driverDisplayName || 'Delivery Partner',
+        mobile: '',
         role: 'Delivery Boy',
         status: isShiftActive ? 'Online' : 'Offline',
-        branchId: safeStorageGet('driver_branch_id') || '',
+        branchId: driverBranchId,
         lastAttendanceDate: isShiftActive ? todayStr : '',
         attendanceMarkedAt: punchInTime || undefined
       } as DeliveryBoyStaff;
     }
     return null;
-  }, [allStaff, selectedBoyId, driverDisplayName, isShiftActive, phoneInput, todayStr, punchInTime]);
+  }, [allStaff, selectedBoyId, driverDisplayName, driverBranchId, isShiftActive, todayStr, punchInTime]);
 
   const driverBranch = useMemo(() => {
     if (!currentBoy?.branchId) return branches[0] || null;
@@ -671,23 +393,9 @@ export const App: React.FC = () => {
 
   // Quick helper to determine if a customer is assigned to this driver
   const isCustomerAssignedToRider = (c: any) => {
-    if (showAllUnassigned) return true;
-    const boyId = selectedBoyId || currentBoy?.id || safeStorageGet('driver_boy_id') || '';
-    const boyName = (currentBoy?.name || driverDisplayName || safeStorageGet('driver_name') || '').toLowerCase().trim();
-    const boyPhone = (phoneInput || currentBoy?.mobile || safeStorageGet('driver_phone') || '').replace(/\D/g, '').slice(-10);
-
-    const cBoyId = String(c.deliveryBoyId || '').trim();
-    const cBoyName = String(c.deliveryBoyName || '').toLowerCase().trim();
-    const cBoyPhone = String(c.deliveryBoyPhone || c.deliveryBoyMobile || '').replace(/\D/g, '').slice(-10);
-
-    if (boyId && (cBoyId === boyId || cBoyId.toLowerCase() === boyId.toLowerCase())) return true;
-    if (boyName && (cBoyName === boyName || cBoyId.toLowerCase() === boyName)) return true;
-    if (boyPhone && (cBoyPhone === boyPhone || cBoyId === boyPhone)) return true;
-    if (!cBoyId && !cBoyName) {
-      if (allStaff.length <= 1) return true;
-      if (currentBoy?.branchId && c.branchId && c.branchId === currentBoy.branchId) return true;
-    }
-    return false;
+    const assignedToDriver = selectedBoyId && String(c.deliveryBoyId || '') === selectedBoyId;
+    const assignedToBranch = !driverBranchId || !c.branchId || c.branchId === driverBranchId;
+    return Boolean(assignedToDriver && assignedToBranch);
   };
 
   // Stop counts for each meal session
@@ -705,7 +413,7 @@ export const App: React.FC = () => {
       counts[meal] = activeForMeal.length;
     });
     return counts;
-  }, [customers, selectedBoyId, currentBoy, driverDisplayName, phoneInput, todayStr, plans, showAllUnassigned, allStaff.length]);
+  }, [customers, selectedBoyId, currentBoy, driverDisplayName, todayStr, plans]);
 
   // Auto-switch to meal session with scheduled deliveries if current session has 0
   useEffect(() => {
@@ -809,7 +517,7 @@ export const App: React.FC = () => {
       });
 
     return activeCustomerStops.sort((a, b) => a.routeOrder - b.routeOrder);
-  }, [customers, selectedBoyId, currentBoy, driverDisplayName, selectedMeal, plans, todayStr, deliveryLogs, showAllUnassigned, allStaff.length, phoneInput]);
+  }, [customers, selectedBoyId, currentBoy, driverDisplayName, selectedMeal, plans, todayStr, deliveryLogs]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
@@ -858,126 +566,102 @@ export const App: React.FC = () => {
 
   // Quick 1-Tap Box Status Update
   const handleQuickBoxStatus = async (stop: any, status: BoxRecollectionStatus, note: string = '') => {
-    if (!bizId) return;
+    if (!bizId || !selectedBoyId) return;
 
-    const customer = stop.customer;
-    const logKey = stop.logKey;
+    const customer = stop.customer as GlobalCustomer;
+    const logKey = stop.logKey as string;
+    const previousLog = deliveryLogs[logKey];
+    const previousCustomer = customers.find(c => c.id === customer.id) || customer;
+    const previousLogFields = previousLog || {};
     const now = new Date();
     const isClean = status === 'Collected' || status === 'Collected Clean';
     const isCollectedAny = isClean || status === 'Dirty / Unwashed';
+    const boxType = customer.reusableBoxType || stop.primaryBoxType || 'Stainless Steel 3-Tier Dabba';
+    const newCount = isCollectedAny
+      ? Math.max(0, (typeof customer.uncollectedBoxesCount === 'number' ? customer.uncollectedBoxesCount : 1) - 1)
+      : (typeof customer.uncollectedBoxesCount === 'number' ? customer.uncollectedBoxesCount : 1);
+    const logPayload = {
+      date: todayStr,
+      customerId: customer.id,
+      customerName: customer.name,
+      branchId: customer.branchId || currentBoy?.branchId || '',
+      deliveryBoyId: selectedBoyId,
+      staffId: selectedBoyId,
+      deliveryBoyName: currentBoy?.name || 'Rider',
+      mealTime: selectedMeal,
+      status: previousLogFields.status || 'Pending',
+      deliveredAt: previousLogFields.deliveredAt || null,
+      reusableBoxEnabled: true,
+      boxType,
+      isDay2Plus: true,
+      boxStatus: status,
+      boxNotes: note.trim(),
+      boxCollectedAt: isClean ? now.toISOString() : null,
+      currentLat: currentCoords?.lat || null,
+      currentLng: currentCoords?.lng || null,
+      updatedAt: now.toISOString()
+    };
+    const boxCollection = {
+      status,
+      boxType,
+      issueNote: note.trim(),
+      collectedAt: now.toISOString(),
+      updatedBy: currentBoy?.name || 'Delivery Partner'
+    };
+    const customerPayload = {
+      uncollectedBoxesCount: newCount,
+      [`boxCollections.${todayStr}_${selectedMeal}`]: boxCollection,
+      updatedAt: now.toISOString()
+    };
 
-    // Optimistic UI update
-    setDeliveryLogs(prev => ({
-      ...prev,
-      [logKey]: {
-        ...(prev[logKey] || {}),
-        date: todayStr,
-        customerId: customer.id,
-        customerName: customer.name,
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || 'Rider',
-        mealTime: selectedMeal,
-        reusableBoxEnabled: true,
-        boxType: customer.reusableBoxType || stop.primaryBoxType || 'Stainless Steel 3-Tier Dabba',
-        isDay2Plus: true,
-        boxStatus: status,
-        boxNotes: note.trim(),
-        boxCollectedAt: isClean ? now.toISOString() : null,
-        updatedAt: now.toISOString()
-      }
-    }));
-
-    setCustomers(prev => prev.map(c => {
-      if (c.id === customer.id) {
-        const prevCount = typeof c.uncollectedBoxesCount === 'number' ? c.uncollectedBoxesCount : 1;
-        const newCount = isCollectedAny ? Math.max(0, prevCount - 1) : prevCount;
-        return {
-          ...c,
-          uncollectedBoxesCount: newCount,
-          boxCollections: {
-            ...(c.boxCollections || {}),
-            [`${todayStr}_${selectedMeal}`]: {
-              status,
-              boxType: customer.reusableBoxType || stop.primaryBoxType || 'Stainless Steel 3-Tier Dabba',
-              issueNote: note.trim(),
-              collectedAt: now.toISOString(),
-              updatedBy: currentBoy?.name || 'Delivery Partner'
-            }
-          }
-        };
-      }
-      return c;
-    }));
-
-    setHighlightedStopId(null);
-    showToast(`✅ Box status recorded as "${status}". You can now mark order as delivered!`);
-
-    if (bizId === 'demo') return;
+    setDeliveryLogs(prev => ({ ...prev, [logKey]: { ...(prev[logKey] || {}), ...logPayload } }));
+    setCustomers(prev => prev.map(c => c.id === customer.id
+      ? { ...c, uncollectedBoxesCount: newCount, boxCollections: {
+          ...(c.boxCollections || {}), [`${todayStr}_${selectedMeal}`]: boxCollection
+        } }
+      : c));
 
     try {
-      const logDocRef = doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${customer.id}_${selectedMeal}`);
-      await setDoc(logDocRef, {
-        date: todayStr,
-        customerId: customer.id,
-        customerName: customer.name,
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || driverDisplayName || 'Rider',
-        mealTime: selectedMeal,
-        reusableBoxEnabled: true,
-        boxType: customer.reusableBoxType || stop.primaryBoxType || 'Stainless Steel 3-Tier Dabba',
-        isDay2Plus: true,
-        boxStatus: status,
-        boxNotes: note.trim(),
-        boxCollectedAt: isClean ? now.toISOString() : null,
-        updatedAt: now.toISOString()
-      }, { merge: true });
-
-      const custDocRef = doc(db, 'businesses', bizId, 'customers', customer.id);
-      const prevCount = typeof customer.uncollectedBoxesCount === 'number' ? customer.uncollectedBoxesCount : 1;
-      const newCount = isCollectedAny ? Math.max(0, prevCount - 1) : prevCount;
-      await updateDoc(custDocRef, {
-        uncollectedBoxesCount: newCount,
-        [`boxCollections.${todayStr}_${selectedMeal}`]: {
-          status,
-          boxType: customer.reusableBoxType || stop.primaryBoxType || 'Stainless Steel 3-Tier Dabba',
-          issueNote: note.trim(),
-          collectedAt: now.toISOString(),
-          updatedBy: currentBoy?.name || 'Delivery Partner'
-        }
+      await Promise.all([
+        setDoc(doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${customer.id}_${selectedMeal}`), logPayload),
+        updateDoc(doc(db, 'businesses', bizId, 'customers', customer.id), customerPayload)
+      ]);
+      showToast(`Box status recorded as "${status}". You can now mark the order as delivered.`);
+    } catch (error) {
+      console.error('Could not save box status:', error);
+      setDeliveryLogs(prev => {
+        const next = { ...prev };
+        if (previousLog) next[logKey] = previousLog;
+        else delete next[logKey];
+        return next;
       });
-    } catch (err) {
-      console.warn("Save quick box status err:", err);
+      setCustomers(prev => prev.map(c => c.id === customer.id ? previousCustomer : c));
+      showToast('Could not save box status. Please retry.', customer.id, () => {
+        void handleQuickBoxStatus(stop, status, note);
+      });
     }
   };
 
   // Handle Attendance Punch In / Shift Start
   const handlePunchIn = async () => {
     if (!bizId || !selectedBoyId) {
-      showToast("⚠️ Missing rider credentials. Please log in with your PIN.");
-      setLoginModalOpen(true);
+      showToast('Your delivery account is not ready. Sign in again to continue.');
       return;
     }
 
     const now = new Date();
+    const nowIso = now.toISOString();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const sessionId = `${todayStr}_${selectedBoyId}`;
-    
+    const previousShift = isShiftActive;
+    const previousPunchInTime = punchInTime;
     setIsShiftActive(true);
     setPunchInTime(timeStr);
-    safeStorageSet('driver_shift_active', 'true');
-    safeStorageSet('driver_shift_date', todayStr);
-    safeStorageSet('driver_punch_in_time', timeStr);
-    showToast(`✅ Shift started successfully at ${timeStr}! Attendance marked.`);
-
-    if (bizId === 'demo') return;
-
-    const cleanPhone = (phoneInput || safeStorageGet('driver_phone') || '').replace(/\D/g, '').slice(-10);
 
     const statusPayload = {
-      bizId,
       staffId: selectedBoyId,
+      deliveryBoyId: selectedBoyId,
       riderName: currentBoy?.name || driverDisplayName || 'Rider',
-      mobile: cleanPhone,
       status: 'Online',
       lastAttendanceDate: todayStr,
       attendanceMarkedAt: timeStr,
@@ -985,145 +669,123 @@ export const App: React.FC = () => {
       isShiftActive: true,
       currentLat: currentCoords?.lat || null,
       currentLng: currentCoords?.lng || null,
-      lastLocationUpdate: now.toISOString(),
-      updatedAt: now.toISOString()
+      lastLocationUpdate: nowIso,
+      updatedAt: nowIso
     };
-
-    setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), statusPayload, { merge: true })
-      .catch(err => console.warn("Driver status sync notice:", err));
-
     const sessionPayload = {
       sessionId,
       staffId: selectedBoyId,
+      deliveryBoyId: selectedBoyId,
       driverName: currentBoy?.name || driverDisplayName || 'Rider',
-      mobile: cleanPhone,
-      branchId: currentBoy?.branchId || '',
+      branchId: currentBoy?.branchId || driverBranchId || '',
       date: todayStr,
-      startTime: now.toISOString(),
+      startTime: nowIso,
       punchInTime: timeStr,
       endTime: null,
       durationMinutes: 0,
       status: 'Active',
       initialLat: currentCoords?.lat || null,
       initialLng: currentCoords?.lng || null,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString()
+      createdAt: nowIso,
+      updatedAt: nowIso
     };
-    setDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId), sessionPayload, { merge: true })
-      .catch(err => console.warn("Driver session write notice:", err));
-
-    setDoc(doc(db, 'businesses', bizId, 'driver_manifest', selectedBoyId), {
-      status: 'Online',
-      lastAttendanceDate: todayStr,
-      attendanceMarkedAt: timeStr,
-      punchInTime: timeStr,
-      isShiftActive: true,
-      updatedAt: now.toISOString()
-    }, { merge: true }).catch(err => console.warn("Driver manifest attendance sync notice:", err));
 
     try {
-      const boyDocRef = doc(db, 'businesses', bizId, 'staff', selectedBoyId);
-      await updateDoc(boyDocRef, {
-        status: 'Online',
-        lastAttendanceDate: todayStr,
-        attendanceMarkedAt: timeStr,
-        updatedAt: now.toISOString()
-      });
-    } catch (writeErr) {
-      console.warn("Direct staff attendance write notice:", writeErr);
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setCurrentCoords(coords);
-
-          setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), {
-            currentLat: pos.coords.latitude,
-            currentLng: pos.coords.longitude,
-            lastLocationUpdate: new Date().toISOString()
-          }, { merge: true }).catch(() => {});
-
-          setDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId), {
-            initialLat: pos.coords.latitude,
-            initialLng: pos.coords.longitude,
-            lastLocationUpdate: new Date().toISOString()
-          }, { merge: true }).catch(() => {});
-        },
-        (err) => console.warn("GPS init:", err.message)
-      );
+      await Promise.all([
+        setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), statusPayload, { merge: true }),
+        setDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId), sessionPayload),
+        updateDoc(doc(db, 'businesses', bizId, 'staff', selectedBoyId), {
+          status: 'Online',
+          lastAttendanceDate: todayStr,
+          attendanceMarkedAt: timeStr,
+          updatedAt: nowIso
+        })
+      ]);
+      showToast(`Shift started successfully at ${timeStr}.`);
+    } catch (error) {
+      console.error('Could not punch in:', error);
+      setIsShiftActive(previousShift);
+      setPunchInTime(previousPunchInTime);
+      showToast('Could not save punch in. Please retry.', undefined, () => { void handlePunchIn(); });
     }
   };
 
   // Handle Shift End
   const handlePunchOut = async () => {
-    if (!confirm("Are you sure you want to end your shift?")) return;
+    if (!confirm('Are you sure you want to end your shift?')) return;
     if (!bizId || !selectedBoyId) return;
 
     const now = new Date();
+    const nowIso = now.toISOString();
     const sessionId = `${todayStr}_${selectedBoyId}`;
+    const previousShift = isShiftActive;
+    const previousPunchInTime = punchInTime;
     setIsShiftActive(false);
     setPunchInTime(null);
-    safeStorageSet('driver_shift_active', 'false');
-    safeStorageSet('driver_punch_in_time', '');
-    showToast("🏁 Shift ended. Have a great rest!");
 
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-
-    if (bizId === 'demo') return;
-
-    let durationMins = 0;
     try {
       const sessionSnap = await getDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId));
-      if (sessionSnap.exists() && sessionSnap.data().startTime) {
-        const startMs = new Date(sessionSnap.data().startTime).getTime();
-        durationMins = Math.max(1, Math.round((now.getTime() - startMs) / 60000));
+      const sessionData = sessionSnap.exists() ? sessionSnap.data() : {};
+      const startTime = sessionData.startTime || null;
+      const durationMinutes = startTime
+        ? Math.max(1, Math.round((now.getTime() - new Date(startTime).getTime()) / 60000))
+        : 0;
+      const punchOutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const sessionPayload = {
+        sessionId,
+        staffId: selectedBoyId,
+        deliveryBoyId: selectedBoyId,
+        driverName: currentBoy?.name || driverDisplayName || 'Rider',
+        branchId: currentBoy?.branchId || driverBranchId || '',
+        date: todayStr,
+        startTime: startTime || nowIso,
+        punchInTime: sessionData.punchInTime || previousPunchInTime || '',
+        endTime: nowIso,
+        punchOutTime,
+        durationMinutes,
+        status: 'Completed',
+        initialLat: sessionData.initialLat ?? currentCoords?.lat ?? null,
+        initialLng: sessionData.initialLng ?? currentCoords?.lng ?? null,
+        finalLat: currentCoords?.lat || null,
+        finalLng: currentCoords?.lng || null,
+        createdAt: sessionData.createdAt || nowIso,
+        updatedAt: nowIso
+      };
+
+      await Promise.all([
+        setDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId), sessionPayload),
+        setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), {
+          staffId: selectedBoyId,
+          deliveryBoyId: selectedBoyId,
+          status: 'Offline',
+          isShiftActive: false,
+          updatedAt: nowIso
+        }, { merge: true }),
+        updateDoc(doc(db, 'businesses', bizId, 'staff', selectedBoyId), {
+          status: 'Offline',
+          updatedAt: nowIso
+        })
+      ]);
+
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
-    } catch (e) {}
-
-    setDoc(doc(db, 'businesses', bizId, 'driver_sessions', sessionId), {
-      status: 'Completed',
-      endTime: now.toISOString(),
-      punchOutTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      durationMinutes: durationMins,
-      finalLat: currentCoords?.lat || null,
-      finalLng: currentCoords?.lng || null,
-      updatedAt: now.toISOString()
-    }, { merge: true }).catch(err => console.warn("Driver session end write notice:", err));
-
-    setDoc(doc(db, 'businesses', bizId, 'driver_status', selectedBoyId), {
-      status: 'Offline',
-      isShiftActive: false,
-      updatedAt: now.toISOString()
-    }, { merge: true }).catch(err => console.warn("Per-tenant status punch out notice:", err));
-
-    setDoc(doc(db, 'businesses', bizId, 'driver_manifest', selectedBoyId), {
-      status: 'Offline',
-      isShiftActive: false,
-      updatedAt: now.toISOString()
-    }, { merge: true }).catch(err => console.warn("Per-tenant manifest punch out notice:", err));
-
-    try {
-      const boyDocRef = doc(db, 'businesses', bizId, 'staff', selectedBoyId);
-      await updateDoc(boyDocRef, {
-        status: 'Offline',
-        updatedAt: now.toISOString()
-      });
-    } catch (err) {
-      console.warn("Direct punch out write notice:", err);
+      showToast('Shift ended. Have a great rest!');
+    } catch (error) {
+      console.error('Could not punch out:', error);
+      setIsShiftActive(previousShift);
+      setPunchInTime(previousPunchInTime);
+      showToast('Could not save punch out. Please retry.', undefined, () => { void handlePunchOut(); });
     }
   };
 
   // Mark Delivery Status
   const handleToggleDelivered = async (stop: any) => {
-    if (!bizId) return;
+    if (!bizId || !selectedBoyId) return;
 
     if (!isShiftActive) {
-      showToast("⚠️ Shift not started! Please tap 'Start Shift / Punch In' at the top of the screen before marking orders as delivered.", stop.customer.id);
+      showToast("Shift not started. Tap 'Start Shift / Punch In' before marking orders as delivered.", stop.customer.id);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1135,331 +797,223 @@ export const App: React.FC = () => {
 
     if (currentStatus === 'Delivered' && hasReusableBox) {
       const activeBoxStatus = deliveryLogs[logKey]?.boxStatus || stop.logRecord?.boxStatus;
-      
-      const isBoxStatusRecorded = activeBoxStatus && 
-        activeBoxStatus !== 'Pending' && 
-        activeBoxStatus !== 'None';
-
-      if (!isBoxStatusRecorded) {
-        showToast("📦 Please update the returned box status (Clean, Unclean, Damaged, or Missing) below before marking this order as delivered!", stop.customer.id);
+      if (!activeBoxStatus || activeBoxStatus === 'Pending' || activeBoxStatus === 'None') {
+        showToast('Record the returned box condition before marking this order as delivered.', stop.customer.id);
         return;
       }
     }
 
-    // Optimistic UI update
-    setDeliveryLogs(prev => ({
-      ...prev,
-      [logKey]: {
-        ...(prev[logKey] || {}),
-        date: todayStr,
-        customerId: stop.customer.id,
-        customerName: stop.customer.name,
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || 'Rider',
-        mealTime: selectedMeal,
-        status: currentStatus,
-        deliveredAt: currentStatus === 'Delivered' ? now.toISOString() : null,
-      }
-    }));
+    const previousLog = deliveryLogs[logKey];
+    const currentLog = previousLog || stop.logRecord || {};
+    const logPayload = {
+      date: todayStr,
+      customerId: stop.customer.id,
+      customerName: stop.customer.name,
+      branchId: stop.customer.branchId || currentBoy?.branchId || driverBranchId || '',
+      deliveryBoyId: selectedBoyId,
+      staffId: selectedBoyId,
+      deliveryBoyName: currentBoy?.name || 'Rider',
+      mealTime: selectedMeal,
+      status: currentStatus,
+      deliveredAt: currentStatus === 'Delivered' ? now.toISOString() : null,
+      reusableBoxEnabled: hasReusableBox,
+      boxType: stop.primaryBoxType || 'Disposable',
+      isDay2Plus: stop.isDay2Plus,
+      boxStatus: hasReusableBox ? (currentLog.boxStatus || 'Pending') : 'Disposable',
+      boxNotes: currentLog.boxNotes || '',
+      currentLat: currentCoords?.lat || null,
+      currentLng: currentCoords?.lng || null,
+      boxCollectedAt: currentLog.boxCollectedAt || null,
+      updatedAt: now.toISOString()
+    };
 
-    if (bizId === 'demo') {
-      return;
-    }
-
+    setDeliveryLogs(prev => ({ ...prev, [logKey]: { ...(prev[logKey] || {}), ...logPayload } }));
     try {
-      const logDocRef = doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${stop.customer.id}_${selectedMeal}`);
-      await setDoc(logDocRef, {
-        date: todayStr,
-        customerId: stop.customer.id,
-        customerName: stop.customer.name,
-        branchId: stop.customer.branchId || currentBoy?.branchId || '',
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || driverDisplayName || 'Rider',
-        mealTime: selectedMeal,
-        status: currentStatus,
-        deliveredAt: currentStatus === 'Delivered' ? now.toISOString() : null,
-        reusableBoxEnabled: hasReusableBox,
-        boxType: stop.primaryBoxType || 'Disposable',
-        isDay2Plus: stop.isDay2Plus,
-        boxStatus: hasReusableBox 
-          ? (stop.logRecord?.boxStatus || 'Pending') 
-          : 'Disposable',
-        boxNotes: stop.logRecord?.boxNotes || '',
-        currentLat: currentCoords?.lat || null,
-        currentLng: currentCoords?.lng || null,
-        updatedAt: now.toISOString()
-      }, { merge: true });
-    } catch (err) {
-      console.warn("Direct delivery log write notice:", err);
+      await setDoc(
+        doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${stop.customer.id}_${selectedMeal}`),
+        logPayload,
+      );
+      showToast(currentStatus === 'Delivered' ? 'Order marked as delivered.' : 'Delivery status reset.');
+    } catch (error) {
+      console.error('Could not update delivery status:', error);
+      setDeliveryLogs(prev => {
+        const next = { ...prev };
+        if (previousLog) next[logKey] = previousLog;
+        else delete next[logKey];
+        return next;
+      });
+      showToast('Could not save delivery status. Please retry.', stop.customer.id, () => {
+        void handleToggleDelivered(stop);
+      });
     }
   };
 
   // Save Box Recollection Condition
   const handleSaveBoxRecollection = async () => {
-    if (!activeBoxModal || !bizId) return;
+    if (!activeBoxModal || !bizId || !selectedBoyId) return;
 
     const { customer, logKey } = activeBoxModal;
+    const previousLog = deliveryLogs[logKey];
+    const previousCustomer = customers.find(c => c.id === customer.id) || customer;
     const now = new Date();
     const isClean = selectedBoxStatus === 'Collected' || selectedBoxStatus === 'Collected Clean';
     const isCollectedAny = isClean || selectedBoxStatus === 'Dirty / Unwashed';
+    const boxType = customer.reusableBoxType || 'Stainless Steel 3-Tier Dabba';
+    const previousCount = typeof customer.uncollectedBoxesCount === 'number' ? customer.uncollectedBoxesCount : 1;
+    const newCount = isCollectedAny ? Math.max(0, previousCount - 1) : previousCount;
+    const collectionStatus = selectedBoxStatus === 'Collected' ? 'Collected Clean'
+      : selectedBoxStatus === 'Dirty / Unwashed' ? 'Collected Unclean' : selectedBoxStatus;
+    const boxCollection = {
+      status: collectionStatus,
+      boxType,
+      issueNote: boxNotes.trim(),
+      collectedAt: now.toISOString(),
+      updatedBy: currentBoy?.name || 'Delivery Partner'
+    };
+    const logPayload = {
+      date: todayStr,
+      customerId: customer.id,
+      customerName: customer.name,
+      branchId: customer.branchId || currentBoy?.branchId || driverBranchId || '',
+      deliveryBoyId: selectedBoyId,
+      staffId: selectedBoyId,
+      deliveryBoyName: currentBoy?.name || 'Rider',
+      mealTime: selectedMeal,
+      status: previousLog?.status || 'Pending',
+      deliveredAt: previousLog?.deliveredAt || null,
+      reusableBoxEnabled: true,
+      boxType,
+      isDay2Plus: true,
+      boxStatus: selectedBoxStatus,
+      boxNotes: boxNotes.trim(),
+      boxCollectedAt: isClean ? now.toISOString() : null,
+      currentLat: currentCoords?.lat || null,
+      currentLng: currentCoords?.lng || null,
+      updatedAt: now.toISOString()
+    };
 
-    setDeliveryLogs(prev => ({
-      ...prev,
-      [logKey]: {
-        ...(prev[logKey] || {}),
-        date: todayStr,
-        customerId: customer.id,
-        customerName: customer.name,
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || 'Rider',
-        mealTime: selectedMeal,
-        reusableBoxEnabled: true,
-        boxType: customer.reusableBoxType || '3-Tier Stainless Steel Tiffin',
-        isDay2Plus: true,
-        boxStatus: selectedBoxStatus,
-        boxNotes: boxNotes.trim(),
-        boxCollectedAt: isClean ? now.toISOString() : null,
-        updatedAt: now.toISOString()
-      }
-    }));
-
-    setCustomers(prev => prev.map(c => {
-      if (c.id === customer.id) {
-        const prevCount = typeof c.uncollectedBoxesCount === 'number' ? c.uncollectedBoxesCount : 1;
-        const newCount = isCollectedAny ? Math.max(0, prevCount - 1) : prevCount;
-        return {
-          ...c,
-          uncollectedBoxesCount: newCount,
-          boxCollections: {
-            ...(c.boxCollections || {}),
-            [`${todayStr}_${selectedMeal}`]: {
-              status: selectedBoxStatus,
-              boxType: customer.reusableBoxType || 'Stainless Steel 3-Tier Dabba',
-              issueNote: boxNotes.trim(),
-              collectedAt: now.toISOString(),
-              updatedBy: currentBoy?.name || 'Delivery Partner'
-            }
-          }
-        };
-      }
-      return c;
-    }));
-
-    setActiveBoxModal(null);
-    setBoxNotes('');
-
-    if (bizId === 'demo') {
-      return;
-    }
+    setDeliveryLogs(prev => ({ ...prev, [logKey]: { ...(prev[logKey] || {}), ...logPayload } }));
+    setCustomers(prev => prev.map(c => c.id === customer.id
+      ? { ...c, uncollectedBoxesCount: newCount, boxCollections: { ...(c.boxCollections || {}), [`${todayStr}_${selectedMeal}`]: boxCollection } }
+      : c));
 
     try {
-      const logDocRef = doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${customer.id}_${selectedMeal}`);
-
-      await setDoc(logDocRef, {
-        date: todayStr,
-        customerId: customer.id,
-        customerName: customer.name,
-        deliveryBoyId: selectedBoyId,
-        deliveryBoyName: currentBoy?.name || driverDisplayName || 'Rider',
-        mealTime: selectedMeal,
-        reusableBoxEnabled: true,
-        boxType: customer.reusableBoxType || '3-Tier Stainless Steel Tiffin',
-        isDay2Plus: true,
-        boxStatus: selectedBoxStatus,
-        boxNotes: boxNotes.trim(),
-        boxCollectedAt: isClean ? now.toISOString() : null,
-        updatedAt: now.toISOString()
-      }, { merge: true });
-
-      try {
-        const custDocRef = doc(db, 'businesses', bizId, 'customers', customer.id);
-        const prevCount = typeof customer.uncollectedBoxesCount === 'number' ? customer.uncollectedBoxesCount : 1;
-        const newCount = isCollectedAny ? Math.max(0, prevCount - 1) : prevCount;
-        
-        await updateDoc(custDocRef, {
+      await Promise.all([
+        setDoc(doc(db, 'businesses', bizId, 'delivery_logs', `${todayStr}_${customer.id}_${selectedMeal}`), logPayload),
+        updateDoc(doc(db, 'businesses', bizId, 'customers', customer.id), {
           uncollectedBoxesCount: newCount,
-          [`boxCollections.${todayStr}_${selectedMeal}`]: {
-            status: selectedBoxStatus === 'Collected' ? 'Collected Clean' : selectedBoxStatus === 'Dirty / Unwashed' ? 'Collected Unclean' : selectedBoxStatus,
-            boxType: customer.reusableBoxType || 'Stainless Steel 3-Tier Dabba',
-            issueNote: boxNotes.trim(),
-            collectedAt: now.toISOString(),
-            updatedBy: currentBoy?.name || driverDisplayName || 'Delivery Partner'
-          },
+          [`boxCollections.${todayStr}_${selectedMeal}`]: boxCollection,
           updatedAt: now.toISOString()
-        });
-      } catch (custErr) {
-        console.warn("Could not sync customer box record directly:", custErr);
-      }
-    } catch (err) {
-      console.warn("Direct box recollection write notice:", err);
+        })
+      ]);
+      setActiveBoxModal(null);
+      setBoxNotes('');
+      showToast('Box condition saved.');
+    } catch (error) {
+      console.error('Could not save box recollection:', error);
+      setDeliveryLogs(prev => {
+        const next = { ...prev };
+        if (previousLog) next[logKey] = previousLog;
+        else delete next[logKey];
+        return next;
+      });
+      setCustomers(prev => prev.map(c => c.id === customer.id ? previousCustomer : c));
+      showToast('Could not save box recollection. Please retry.', customer.id, () => {
+        void handleSaveBoxRecollection();
+      });
     }
   };
 
-  // Server-Verified Login Handler (Native Firebase Email/Password Auth + Custom Token Fallback)
+  // Firebase email/password sign-in with the server-verified callable fallback.
   const handleVerifyLogin = async () => {
-    const cleanEmail = (emailInput || '').trim().toLowerCase();
-    const cleanPassword = (passwordInput || '');
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPassword = passwordInput;
 
     if (!cleanEmail || !cleanEmail.includes('@')) {
       setLoginError('Please enter a valid delivery partner email.');
       return;
     }
-
-    if (!cleanPassword || cleanPassword.length < 6) {
-      setLoginError('Password must be at least 6 characters.');
+    if (!cleanPassword) {
+      setLoginError('Please enter your password.');
       return;
     }
 
     setVerifying(true);
     setLoginError(null);
-
     try {
-      let loggedInUser: any = null;
-
-      // 1. First attempt native Firebase Auth signInWithEmailAndPassword
+      let userCredential;
       try {
-        const userCred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-        loggedInUser = userCred.user;
-      } catch (authErr: any) {
-        console.warn("Direct signInWithEmailAndPassword notice:", authErr?.code);
+        userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      } catch {
+        const result = await driverLoginCallable({ email: cleanEmail, password: cleanPassword });
+        if (!result.data?.token) throw new Error('The delivery login service did not return an authentication token.');
+        userCredential = await signInWithCustomToken(auth, result.data.token);
       }
 
-      // 2. If direct auth succeeded, inspect claims and profile
-      if (loggedInUser) {
-        const claims = await getDriverClaims(loggedInUser);
-        let resolvedBiz = claims?.bizId || bizId || '';
-        let resolvedStaff = claims?.staffId || '';
-        let resolvedBranch = claims?.branchId || '';
-        let resolvedName = loggedInUser.displayName || '';
-        let resolvedMobile = '';
-
-        try {
-          const profileSnap = await getDoc(doc(db, 'driver_profiles', loggedInUser.uid));
-          if (profileSnap.exists()) {
-            const p = profileSnap.data();
-            if (p.active === false || p.status === 'Inactive') {
-              await signOut(auth);
-              setVerifying(false);
-              setLoginError('This delivery partner account has been deactivated. Please contact your kitchen manager.');
-              return;
-            }
-            if (!resolvedBiz && p.bizId) resolvedBiz = p.bizId;
-            if (!resolvedStaff && p.staffId) resolvedStaff = p.staffId;
-            if (!resolvedBranch && p.branchId) resolvedBranch = p.branchId;
-            if (p.name) resolvedName = p.name;
-            if (p.mobile) resolvedMobile = p.mobile;
-          }
-        } catch (e) {}
-
-        if (resolvedBiz && resolvedStaff) {
-          safeStorageSet('driver_is_logged_in', 'true');
-          safeStorageSet('driver_session_expires', String(Date.now() + 14 * 24 * 60 * 60 * 1000));
-          safeStorageSet('driver_name', resolvedName || 'Delivery Partner');
-          safeStorageSet('driver_email', cleanEmail);
-          if (resolvedMobile) safeStorageSet('driver_phone', resolvedMobile);
-          safeStorageSet('driver_biz_id', resolvedBiz);
-          safeStorageSet('driver_boy_id', resolvedStaff);
-          if (resolvedBranch) safeStorageSet('driver_branch_id', resolvedBranch);
-
-          setDriverDisplayName(resolvedName || 'Delivery Partner');
-          setBizId(resolvedBiz);
-          setSelectedBoyId(resolvedStaff);
-          setLoginModalOpen(false);
-          setPasswordInput('');
-          setVerifying(false);
-          showToast(`Welcome back, ${resolvedName || 'Delivery Partner'}! Ready for deliveries.`);
-          return;
-        }
+      const claims = await getDriverClaims(userCredential.user);
+      if (claims?.role !== 'driver' || !claims.bizId || !claims.staffId) {
+        await signOut(auth);
+        throw new Error('This account is not authorized as a delivery partner. Please use the email and password provided by your kitchen owner.');
+      }
+      const profileSnap = await getDoc(doc(db, 'driver_profiles', userCredential.user.uid));
+      if (profileSnap.exists() && profileSnap.data().active === false) {
+        await signOut(auth);
+        throw new Error('This delivery partner account has been deactivated. Please contact your kitchen owner.');
       }
 
-      // 3. Fallback to server-side driverLogin Cloud Function callable
-      const result = await driverLoginCallable({
-        email: cleanEmail,
-        password: cleanPassword,
-        bizId: bizId || undefined
-      });
-
-      if (result?.data?.token) {
-        await signInWithCustomToken(auth, result.data.token);
-
-        const driverInfo = result.data.driver;
-        const name = driverInfo.name || 'Delivery Partner';
-        const businessId = driverInfo.bizId;
-        const staffId = driverInfo.staffId;
-        const branchId = driverInfo.branchId || '';
-        const driverMobile = driverInfo.mobile || '';
-
-        safeStorageSet('driver_is_logged_in', 'true');
-        safeStorageSet('driver_session_expires', String(Date.now() + 14 * 24 * 60 * 60 * 1000));
-        setDriverDisplayName(name);
-        safeStorageSet('driver_name', name);
-        safeStorageSet('driver_email', cleanEmail);
-        if (driverMobile) safeStorageSet('driver_phone', driverMobile);
-        safeStorageSet('driver_biz_id', businessId);
-        if (staffId) safeStorageSet('driver_boy_id', staffId);
-        if (branchId) safeStorageSet('driver_branch_id', branchId);
-
-        setBizId(businessId);
-        if (staffId) setSelectedBoyId(staffId);
-        setLoginModalOpen(false);
-        setPasswordInput('');
-        setVerifying(false);
-        showToast(`Welcome back, ${name}! Ready for today's deliveries.`);
-      }
+      setPasswordInput('');
+      setLoginModalOpen(false);
+      showToast(`Welcome back, ${userCredential.user.displayName || 'Delivery Partner'}!`);
     } catch (error: any) {
-      setVerifying(false);
-      const errorMsg = error?.message || '';
+      console.error('Delivery partner sign-in failed:', error);
       const errorCode = error?.code || '';
-
-      if (errorCode === 'functions/resource-exhausted' || errorMsg.includes('locked')) {
-        setLoginError(errorMsg);
+      const errorMessage = error?.message || '';
+      if (errorCode === 'functions/resource-exhausted' || errorMessage.includes('locked')) {
+        setLoginError(errorMessage);
+      } else if (errorMessage.includes('not authorized') || errorMessage.includes('deactivated')) {
+        setLoginError(errorMessage);
       } else if (
-        errorCode === 'functions/unauthenticated' || 
-        errorCode === 'auth/wrong-password' || 
-        errorCode === 'auth/invalid-credential' || 
+        errorCode === 'functions/unauthenticated' ||
+        errorCode === 'auth/wrong-password' ||
+        errorCode === 'auth/invalid-credential' ||
         errorCode === 'auth/user-not-found' ||
-        errorMsg.includes('Invalid') || 
-        errorMsg.includes('not found')
+        errorMessage.includes('Invalid')
       ) {
         setLoginError('Invalid email or password. Please verify your credentials or contact your kitchen owner.');
-      } else if (errorCode === 'functions/permission-denied' || errorMsg.includes('deactivated') || errorMsg.includes('expired')) {
-        setLoginError(errorMsg);
       } else {
-        setLoginError(`Sign in error: ${errorMsg || 'Unable to connect to kitchen. Please check internet connection.'}`);
+        setLoginError(`Sign in error: ${errorMessage || 'Unable to connect. Check your internet connection and try again.'}`);
       }
+    } finally {
+      setVerifying(false);
     }
   };
 
-  // Logout Handler (Cleans Delivery app auth and driver-specific storage only)
   const handleDriverLogout = async () => {
-    if (window.confirm("Are you sure you want to log out of the Delivery Partner app?")) {
-      try {
-        await signOut(auth);
-      } catch (e) {
-        console.warn("Sign out err:", e);
-      }
-      safeStorageSet('driver_is_logged_in', 'false');
-      safeStorageSet('driver_session_expires', '0');
-      safeStorageSet('driver_session_token', '');
-      safeStorageSet('driver_pin_version', '');
-      safeStorageSet('driver_auth_pin', '');
-      safeStorageSet('driver_token_pin', '');
-      safeStorageSet('driver_boy_id', '');
-      safeStorageSet('driver_name', '');
-      safeStorageSet('driver_phone', '');
-      safeStorageSet('driver_biz_id', '');
-      safeStorageSet('driver_branch_id', '');
-      setBizId('');
-      setSelectedBoyId('');
-      setDriverDisplayName('');
+    if (!window.confirm('Are you sure you want to log out of the Delivery Partner app?')) return;
+    try {
+      await signOut(auth);
       setPasswordInput('');
-      setLoginModalOpen(true);
-      showToast("Logged out successfully.");
+      setLoginError(null);
+      showToast('Logged out successfully.');
+    } catch (error) {
+      console.error('Could not sign out:', error);
+      showToast('Could not log out. Please try again.');
     }
   };
 
-  // If no business or rider is connected, display Login screen
-  if (!bizId || (!isDriverLoggedIn && !isDemoMode)) {
+  if (authInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw size={28} className="animate-spin text-amber-400 mx-auto mb-3" />
+          <p className="text-sm text-slate-300">Verifying delivery account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no authenticated driver claims are available, display the email/password login.
+  if (!bizId || !selectedBoyId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-white flex items-center justify-center p-4">
         <div className="glass-card bg-white/10 backdrop-blur-xl p-6 sm:p-8 rounded-3xl max-w-md w-full border border-white/20 text-center space-y-5 shadow-2xl">
@@ -1471,6 +1025,7 @@ export const App: React.FC = () => {
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               Enter your registered Email and Password to access today's meal delivery route.
             </p>
+            <p className="text-[11px] text-slate-400 mt-2">Forgot password? Ask your kitchen owner.</p>
           </div>
 
           {loginError && (
@@ -1482,6 +1037,12 @@ export const App: React.FC = () => {
               <button onClick={() => setLoginError(null)} className="text-rose-300 hover:text-white">
                 <X size={14} />
               </button>
+            </div>
+          )}
+
+          {routeError && (
+            <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200">
+              {routeError}
             </div>
           )}
 
@@ -1561,17 +1122,6 @@ export const App: React.FC = () => {
             </button>
           </form>
 
-          {/* Demo Route Preview Button */}
-          <div className="pt-2 border-t border-white/10 space-y-2">
-            <button
-              type="button"
-              onClick={launchDemoMode}
-              className="w-full py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
-            >
-              <Sparkles size={13} className="text-amber-400" />
-              <span>Launch Demo Rider Route (Preview)</span>
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -1623,8 +1173,8 @@ export const App: React.FC = () => {
 
         {/* Right Corner: Driver Name Badge, Shift Action Button & Company Logo */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {Boolean(currentBoy?.name || driverDisplayName || safeStorageGet('driver_name') || safeStorageGet('driver_token_name')) && (() => {
-            const rawName = currentBoy?.name || driverDisplayName || safeStorageGet('driver_name') || safeStorageGet('driver_token_name') || 'Partner';
+          {Boolean(currentBoy?.name || driverDisplayName) && (() => {
+            const rawName = currentBoy?.name || driverDisplayName || 'Partner';
             const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
             return (
               <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-200 shadow-xs">
@@ -1692,6 +1242,19 @@ export const App: React.FC = () => {
               <span className="text-base shrink-0">🔔</span>
               <span>{toastMessage}</span>
             </div>
+            {retryAction && (
+              <button
+                onClick={() => {
+                  const retry = retryAction;
+                  setRetryAction(null);
+                  setToastMessage(null);
+                  retry();
+                }}
+                className="px-2.5 py-1 bg-slate-950 text-white rounded-lg"
+              >
+                Retry
+              </button>
+            )}
             <button 
               onClick={() => setToastMessage(null)}
               className="p-1 hover:bg-black/10 rounded-lg text-slate-950 shrink-0"
@@ -2325,16 +1888,6 @@ export const App: React.FC = () => {
               )}
 
               <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                {!showAllUnassigned && customers.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllUnassigned(true)}
-                    className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1.5"
-                  >
-                    <Sparkles size={13} />
-                    <span>Show All Unassigned Kitchen Stops</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -2362,8 +1915,9 @@ export const App: React.FC = () => {
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Sign in with your kitchen email & password
                 </p>
+                <p className="text-[10px] text-slate-500 mt-1">Forgot password? Ask your kitchen owner.</p>
               </div>
-              {selectedBoyId && isDriverLoggedIn && (
+              {selectedBoyId && (
                 <button 
                   onClick={() => setLoginModalOpen(false)} 
                   className="text-slate-400 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
@@ -2392,22 +1946,6 @@ export const App: React.FC = () => {
               }}
               className="space-y-3.5 pt-1"
             >
-              {/* Optional Kitchen / Business ID */}
-              {!bizId && (
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                    Kitchen / Business ID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. MyKitchen or leave blank"
-                    value={bizId}
-                    onChange={(e) => setBizId(e.target.value.trim())}
-                    className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-500 text-xs font-mono outline-none focus:ring-2 focus:ring-amber-400"
-                  />
-                </div>
-              )}
-
               {/* Email Address */}
               <div>
                 <label className="text-[11px] font-semibold text-slate-300 block mb-1">

@@ -382,9 +382,23 @@ describe('ScaleKitchen Firestore Security Rules Test Suite', () => {
       await assertSucceeds(setDoc(doc(db, 'businesses/biz_a/delivery_logs/log_101'), {
         date: '2026-10-17',
         customerId: 'cust_1',
+        customerName: 'Customer A1',
+        branchId: 'branch_1',
         mealTime: 'Lunch',
         status: 'Delivered',
-        deliveryBoyId: 'driver_1'
+        deliveredAt: '2026-10-17T10:00:00Z',
+        deliveryBoyId: 'driver_1',
+        staffId: 'driver_1',
+        deliveryBoyName: 'Raju Rider',
+        reusableBoxEnabled: false,
+        boxType: 'Disposable',
+        isDay2Plus: false,
+        boxStatus: 'Disposable',
+        boxNotes: '',
+        boxCollectedAt: null,
+        currentLat: null,
+        currentLng: null,
+        updatedAt: '2026-10-17T10:00:00Z'
       }));
     });
 
@@ -404,8 +418,18 @@ describe('ScaleKitchen Firestore Security Rules Test Suite', () => {
         lastUpdate: '2026-10-17'
       }));
       await assertSucceeds(setDoc(doc(db, 'businesses/biz_a/driver_sessions/2026-10-17_driver_1'), {
+        sessionId: '2026-10-17_driver_1',
+        staffId: 'driver_1',
+        deliveryBoyId: 'driver_1',
         status: 'Active',
-        date: '2026-10-17'
+        date: '2026-10-17',
+        startTime: '2026-10-17T08:30:00Z',
+        punchInTime: '08:30 AM',
+        endTime: null,
+        durationMinutes: 0,
+        branchId: 'branch_1',
+        createdAt: '2026-10-17T08:30:00Z',
+        updatedAt: '2026-10-17T08:30:00Z'
       }));
     });
 

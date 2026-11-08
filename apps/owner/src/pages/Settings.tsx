@@ -74,7 +74,6 @@ interface DeliveryBoy {
   status?: 'Active' | 'Inactive';
   active?: boolean;
   authUid?: string;
-  pin?: string;
 }
 
 interface CustomBoxType { 
@@ -143,7 +142,7 @@ const Settings = () => {
 
 
 
-  // Driver directory sync is now securely handled server-side via setDriverPinCallable and Cloud Functions.
+  // Delivery partner credentials are managed server-side by Cloud Functions.
 
   // Combine built-in standard box types with custom box types
   const allBoxTypes = useMemo(() => {
@@ -315,14 +314,9 @@ const Settings = () => {
           status: cleanStatus
         });
       }
-    } catch (callableErr: any) {
-      console.warn("Delivery boy account callable notice:", callableErr?.message);
-      // Fallback: write to staff collection directly
-      if (editingItem) {
-        await updateItem(currentUser.uid, 'staff', editingItem.id, staffData);
-      } else {
-        await addItem(currentUser.uid, 'staff', staffData);
-      }
+    } catch (callableErr) {
+      console.error("Delivery partner account callable failed:", callableErr);
+      throw callableErr;
     }
 
     setActiveModal(null);
@@ -676,7 +670,7 @@ const Settings = () => {
     );
   };
 
-  // --- DELIVERY BOY MODAL (Complete Email + Password Account Management — PIN Removed) ---
+  // --- DELIVERY PARTNER MODAL (Email + Password Account Management) ---
   const DeliveryBoyModal = ({ initialData, onClose }: { initialData?: DeliveryBoy, onClose: () => void }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -896,7 +890,7 @@ const Settings = () => {
               </div>
 
               <p className="text-[10px] text-blue-700/90 leading-relaxed">
-                The delivery partner will use this email and password to log in to the Delivery portal from any smartphone, tablet, or PC without needing an SMS PIN.
+                Share this email and password with the delivery partner so they can sign in to the Delivery portal.
               </p>
             </div>
 

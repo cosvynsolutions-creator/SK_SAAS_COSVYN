@@ -47,7 +47,7 @@ export const functions = getFunctions(app);
 
 // Callable function instances
 export const driverLoginCallable = httpsCallable<
-  { phone: string; pin: string },
+  { email: string; password: string; bizId: string },
   { token: string; driver: { name: string; bizId: string; staffId: string; branchId: string; mobile: string } }
 >(functions, 'driverLogin');
 

@@ -49,6 +49,13 @@ service cloud.firestore {
              request.auth.token.bizId == bizId;
     }
 
+    function isOwnTenantDriver(bizId) {
+      return isTenantDriver(bizId) &&
+             'staffId' in request.auth.token &&
+             request.auth.token.staffId is string &&
+             request.auth.token.staffId.size() > 0;
+    }
+
     // 4. Branch Manager check: custom token claim validates role + bizId
     //    Manager can only act within their assigned business
     function isTenantManager(bizId) {
@@ -294,7 +301,17 @@ service cloud.firestore {
         // Owner, drivers, and branch managers can write delivery updates
         allow create, update: if isOwner(userId) || 
                                  isAdmin() || 
-                                 isTenantDriver(userId) || 
+                                 (isOwnTenantDriver(userId) &&
+                                  request.resource.data.staffId == request.auth.token.staffId &&
+                                  request.resource.data.deliveryBoyId == request.auth.token.staffId &&
+                                  request.resource.data.keys().hasAll(['date', 'customerId', 'mealTime', 'staffId', 'deliveryBoyId']) &&
+                                  request.resource.data.keys().hasOnly([
+                                    'date', 'customerId', 'customerName', 'branchId',
+                                    'deliveryBoyId', 'staffId', 'deliveryBoyName', 'mealTime',
+                                    'status', 'deliveredAt', 'reusableBoxEnabled', 'boxType',
+                                    'isDay2Plus', 'boxStatus', 'boxNotes', 'boxCollectedAt',
+                                    'currentLat', 'currentLng', 'updatedAt'
+                                  ])) ||
                                  (isTenantManager(userId) && (isAllBranchManager(userId) || !('branchId' in request.resource.data) || request.resource.data.branchId == request.auth.token.branchId));
         
         allow delete: if isOwner(userId) || isAdmin();
@@ -333,7 +350,17 @@ service cloud.firestore {
                        isTenantDriver(userId) || 
                        isTenantManager(userId);
         
-        allow write: if isOwner(userId) || isAdmin() || isTenantManager(userId) || isTenantDriver(userId);
+        allow write: if isOwner(userId) || isAdmin() || isTenantManager(userId) ||
+          (isOwnTenantDriver(userId) &&
+           request.resource.data.staffId == request.auth.token.staffId &&
+           request.resource.data.deliveryBoyId == request.auth.token.staffId &&
+           request.resource.data.keys().hasAll(['sessionId', 'staffId', 'deliveryBoyId', 'date', 'status']) &&
+           request.resource.data.keys().hasOnly([
+             'sessionId', 'staffId', 'deliveryBoyId', 'driverName', 'branchId',
+             'date', 'startTime', 'punchInTime', 'endTime', 'punchOutTime',
+             'durationMinutes', 'status', 'initialLat', 'initialLng',
+             'finalLat', 'finalLng', 'lastLocationUpdate', 'createdAt', 'updatedAt'
+           ]));
       }
 
       // --- Branch Managers ---

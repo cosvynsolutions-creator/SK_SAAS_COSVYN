@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
-  decodeDriverToken, 
   getDefaultMealSessionForTime, 
   isReusableBoxType, 
   formatDateDDMMYYYY, 
@@ -37,44 +36,7 @@ describe('ScaleKitchen Delivery App — Phase 3 Test Suite', () => {
     });
   });
 
-  describe('2. Legacy URL Link & Obfuscated Token Compatibility', () => {
-    it('should correctly decode valid obfuscated driver tokens without exposing PIN', () => {
-      const payload = {
-        b: 'biz-kitchen-123',
-        s: 'rider-456',
-        m: '9876543210',
-        n: 'Raju Rider',
-        t: Date.now()
-      };
-      const json = JSON.stringify(payload);
-      const encoded = btoa(encodeURIComponent(json))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-
-      const decoded = decodeDriverToken(encoded);
-      expect(decoded).not.toBeNull();
-      expect(decoded?.bizId).toBe('biz-kitchen-123');
-      expect(decoded?.boyId).toBe('rider-456');
-      expect(decoded?.mobile).toBe('9876543210');
-      expect(decoded?.name).toBe('Raju Rider');
-      expect(decoded?.pin).toBeUndefined(); // Never contains or yields PIN
-    });
-
-    it('should return null on invalid or corrupted tokens safely', () => {
-      expect(decodeDriverToken('')).toBeNull();
-      expect(decodeDriverToken('invalid-token-!@#$%')).toBeNull();
-      expect(decodeDriverToken('e30')).toBeNull(); // Empty object `{}`
-    });
-
-    it('should enforce that URL parameters cannot bypass PIN verification', () => {
-      // Security test: decoded params only provide context, never authenticated state
-      const decoded = decodeDriverToken('eyJic2QiOiJhdHRhY2tlciJ9'); // { bsd: 'attacker' }
-      expect(decoded).toBeNull();
-    });
-  });
-
-  describe('3. Pure Business Logic & Delivery Scheduling', () => {
+  describe('2. Pure Business Logic & Delivery Scheduling', () => {
     it('should accurately determine default meal session based on hour boundaries', () => {
       // Breakfast: 00:00 to 10:59
       const morning = new Date('2026-10-15T08:30:00');
@@ -252,67 +214,19 @@ describe('ScaleKitchen Delivery App — Phase 3 Test Suite', () => {
     });
   });
 
-  describe('5. Demo Mode & Tenant Isolation Safety', () => {
-    it('should verify that demo mode business ID is "demo"', () => {
-      const isDemo = (bizId: string) => bizId === 'demo';
-      expect(isDemo('demo')).toBe(true);
-      expect(isDemo('actual-production-biz-id')).toBe(false);
-    });
+  describe('5. Firebase claim-based driver identity', () => {
+    it('requires role, business, and staff claims to identify a delivery partner', () => {
+      const isDriverIdentity = (claims: { role?: string; bizId?: string; staffId?: string }) =>
+        claims.role === 'driver' && Boolean(claims.bizId) && Boolean(claims.staffId);
 
-    it('should ensure demo mode never writes to production Firestore collections', () => {
-      const mockSetDoc = vi.fn();
-      const mockUpdateDoc = vi.fn();
-
-      const safeWrite = async (bizId: string) => {
-        if (bizId === 'demo') {
-          return; // Strict guard
-        }
-        await mockSetDoc();
-      };
-
-      safeWrite('demo');
-      expect(mockSetDoc).not.toHaveBeenCalled();
-      expect(mockUpdateDoc).not.toHaveBeenCalled();
+      expect(isDriverIdentity({ role: 'driver', bizId: 'biz-1', staffId: 'rider-1' })).toBe(true);
+      expect(isDriverIdentity({ role: 'owner', bizId: 'biz-1', staffId: 'rider-1' })).toBe(false);
+      expect(isDriverIdentity({ role: 'driver', bizId: 'biz-1' })).toBe(false);
+      expect(isDriverIdentity({ role: 'driver', staffId: 'rider-1' })).toBe(false);
     });
   });
 
-  describe('6. Authentication Flow & Validation Contract', () => {
-    it('should reject invalid mobile numbers before network dispatch', () => {
-      const validate = (phone: string, pin: string) => {
-        const digits = phone.replace(/\D/g, '').slice(-10);
-        if (!digits || digits.length !== 10) return 'Invalid phone';
-        if (!pin || pin.length < 4 || pin.length > 6) return 'Invalid PIN';
-        return null;
-      };
-
-      expect(validate('12345', '1234')).toBe('Invalid phone');
-      expect(validate('9876543210', '12')).toBe('Invalid PIN');
-      expect(validate('9876543210', '1234567')).toBe('Invalid PIN');
-      expect(validate('9876543210', '1234')).toBeNull();
-      expect(validate('9876543210', '123456')).toBeNull();
-    });
-
-    it('should map lockout errors to user-friendly messages', () => {
-      const mapError = (err: { code?: string; message?: string }) => {
-        if (err.code === 'functions/resource-exhausted' || err.message?.includes('locked')) {
-          return 'Account temporarily locked due to consecutive failed attempts.';
-        }
-        if (err.code === 'functions/unauthenticated' || err.message?.includes('Incorrect')) {
-          return 'Invalid mobile number or PIN.';
-        }
-        return 'Connection error. Please try again.';
-      };
-
-      expect(mapError({ code: 'functions/resource-exhausted', message: 'locked for 15 min' }))
-        .toBe('Account temporarily locked due to consecutive failed attempts.');
-      expect(mapError({ code: 'functions/unauthenticated', message: 'Incorrect PIN' }))
-        .toBe('Invalid mobile number or PIN.');
-      expect(mapError({ code: 'unknown', message: 'timeout' }))
-        .toBe('Connection error. Please try again.');
-    });
-  });
-
-  describe('7. Email + Password Redesign & Credential Architecture', () => {
+  describe('6. Email + Password Authentication & Credential Architecture', () => {
     it('should validate driver email and password before dispatch', () => {
       const validateDriverCredentials = (email: string, pass: string) => {
         const cleanEmail = String(email || '').trim().toLowerCase();

@@ -140,16 +140,11 @@ exports.scheduledFirestoreExport = onSchedule(
 
 /**
  * driverLogin
- * Verifies driver phone + PIN, enforces lockout (5 failures -> 15 min lock),
- * and issues a Firebase Custom Token with claims: { role: 'driver', bizId, staffId, branchId }
- */
-/**
- * driverLogin
- * Verifies driver email + password (or legacy phone + PIN), enforces lockout (5 failures -> 15 min lock),
+ * Verifies driver email + password, enforces lockout (5 failures -> 15 min lock),
  * and issues a Firebase Custom Token with claims: { role: 'driver', bizId, staffId, branchId }
  */
 exports.driverLogin = onCall({ cors: true }, async (request) => {
-  const { email, password, phone, pin, bizId: reqBizId } = request.data || {};
+  const { email, password, bizId: reqBizId } = request.data || {};
 
   const cleanEmail = email ? String(email).trim().toLowerCase() : '';
   const cleanPassword = password ? String(password) : '';
@@ -157,15 +152,14 @@ exports.driverLogin = onCall({ cors: true }, async (request) => {
   const db = admin.firestore();
   const now = Date.now();
 
-  // === 1. EMAIL + PASSWORD LOGIN FLOW ===
-  if (cleanEmail) {
-    if (!cleanEmail.includes('@')) {
-      throw new HttpsError('invalid-argument', 'Valid driver email is required.');
-    }
-    if (!cleanPassword) {
-      throw new HttpsError('invalid-argument', 'Password is required.');
-    }
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    throw new HttpsError('invalid-argument', 'Valid driver email is required.');
+  }
+  if (!cleanPassword) {
+    throw new HttpsError('invalid-argument', 'Password is required.');
+  }
 
+  {
     const safeEmailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
     const rateLimitRef = db.collection('auth_rate_limits').doc(`driver_email_${safeEmailKey}`);
     const rateLimitSnap = await rateLimitRef.get();
@@ -238,7 +232,7 @@ exports.driverLogin = onCall({ cors: true }, async (request) => {
           if (groupSnap.size > 1) {
             throw new HttpsError(
               'failed-precondition',
-              'Multiple kitchen accounts found for this email. Please specify your Kitchen / Business ID to sign in.'
+              'Multiple delivery accounts are associated with this email. Please contact your kitchen owner.'
             );
           }
           const docSnap = groupSnap.docs[0];
@@ -262,7 +256,10 @@ exports.driverLogin = onCall({ cors: true }, async (request) => {
         if (credSnap.exists) {
           passwordHash = credSnap.data().passwordHash;
         }
-      } catch (e) {}
+      } catch (error) {
+        console.error('[driverLogin] Could not load delivery credentials:', error);
+        throw new HttpsError('internal', 'Unable to verify delivery credentials. Please try again.');
+      }
     }
 
     // Verify Password with bcrypt against passwordHash
@@ -306,7 +303,7 @@ exports.driverLogin = onCall({ cors: true }, async (request) => {
     const branchId = driverDoc.branchId || '';
     const name = driverDoc.name || 'Delivery Partner';
 
-    const uid = `driver_${resolvedBizId}_${staffId}`;
+    const uid = driverDoc.authUid || `driver_${resolvedBizId}_${staffId}`;
     const claims = {
       role: 'driver',
       bizId: resolvedBizId,
@@ -335,138 +332,6 @@ exports.driverLogin = onCall({ cors: true }, async (request) => {
     };
   }
 
-  // === 2. LEGACY PHONE + PIN FLOW (Preserved for compatibility) ===
-  const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
-  if (!cleanPhone || cleanPhone.length !== 10) {
-    throw new HttpsError('invalid-argument', 'Valid driver email or 10-digit mobile number is required.');
-  }
-
-  const cleanPin = String(pin || '').trim();
-  if (!cleanPin || !/^\d{4,6}$/.test(cleanPin)) {
-    throw new HttpsError('invalid-argument', 'PIN must be between 4 and 6 digits.');
-  }
-
-  const rateLimitRef = db.collection('auth_rate_limits').doc(`driver_${cleanPhone}`);
-  const rateLimitSnap = await rateLimitRef.get();
-  const rateLimitData = rateLimitSnap.exists ? rateLimitSnap.data() : { attempts: 0, lockedUntil: null };
-
-  // Check if locked out
-  if (rateLimitData.lockedUntil && Number(rateLimitData.lockedUntil) > now) {
-    const remainingMinutes = Math.max(1, Math.ceil((Number(rateLimitData.lockedUntil) - now) / 60000));
-    throw new HttpsError(
-      'resource-exhausted',
-      `Account temporarily locked due to 5 consecutive failed attempts. Please wait ${remainingMinutes} minute(s) before trying again.`
-    );
-  }
-
-  const recordFailedAttempt = async () => {
-    const attempts = (rateLimitData.attempts || 0) + 1;
-    const isLocked = attempts >= 5;
-    const lockedUntil = isLocked ? now + (15 * 60 * 1000) : null;
-
-    await rateLimitRef.set({
-      attempts: isLocked ? 0 : attempts,
-      lockedUntil,
-      lastFailedAt: admin.firestore.FieldValue.serverTimestamp(),
-      phone: cleanPhone
-    }, { merge: true });
-
-    if (isLocked) {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Account locked for 15 minutes due to 5 consecutive failed login attempts.'
-      );
-    }
-    const remaining = 5 - attempts;
-    throw new HttpsError(
-      'unauthenticated',
-      `Invalid mobile number or PIN. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout)`
-    );
-  };
-
-  // 1. Resolve rider ONLY from driver_auth_lookup/{cleanPhone} (O(1) doc read)
-  const lookupRef = db.collection('driver_auth_lookup').doc(cleanPhone);
-  const lookupSnap = await lookupRef.get();
-
-  if (!lookupSnap.exists) {
-    await recordFailedAttempt();
-  }
-
-  const driverDoc = lookupSnap.data();
-
-  // 2. Verify with bcrypt against pinHash ONLY (no plaintext fallback)
-  let isMatch = false;
-  if (driverDoc && driverDoc.pinHash) {
-    try {
-      isMatch = bcrypt.compareSync(cleanPin, driverDoc.pinHash);
-    } catch (bcryptErr) {
-      console.error('[driverLogin] bcrypt compare error:', bcryptErr);
-      isMatch = false;
-    }
-  }
-
-  if (!isMatch) {
-    await recordFailedAttempt();
-  }
-
-  // 4. Reject if lookup.active === false or status === 'Inactive'
-  if (driverDoc.active === false || driverDoc.status === 'Inactive') {
-    throw new HttpsError('permission-denied', 'This delivery partner account has been deactivated. Please contact your kitchen owner.');
-  }
-
-  // 4b. Reject if the business planStatus is Expired
-  const bizId = driverDoc.bizId || '';
-  if (!bizId) {
-    throw new HttpsError('not-found', 'No associated kitchen found for this delivery partner.');
-  }
-
-  const bizSnap = await db.collection('businesses').doc(bizId).get();
-  if (!bizSnap.exists) {
-    throw new HttpsError('not-found', 'Associated kitchen was not found.');
-  }
-  const bizData = bizSnap.data();
-  if (bizData.planStatus === 'Expired') {
-    throw new HttpsError('permission-denied', 'Kitchen subscription has expired. Please contact the kitchen owner.');
-  }
-
-  // Successful login -> clear lockout records
-  await rateLimitRef.set({
-    attempts: 0,
-    lockedUntil: null,
-    lastSuccessAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
-
-  const staffId = driverDoc.staffId || driverDoc.id || 'driver-1';
-  const branchId = driverDoc.branchId || '';
-  const name = driverDoc.name || 'Delivery Partner';
-
-  // 5. Issue custom token with claims { role:'driver', bizId, staffId, branchId } and uid driver_${bizId}_${staffId}
-  const uid = `driver_${bizId}_${staffId}`;
-  const claims = {
-    role: 'driver',
-    bizId,
-    staffId,
-    branchId
-  };
-
-  let customToken;
-  try {
-    customToken = await admin.auth().createCustomToken(uid, claims);
-  } catch (tokenErr) {
-    console.error('[driverLogin] createCustomToken error:', tokenErr);
-    throw new HttpsError('internal', 'Failed to generate authentication token. Please try again.');
-  }
-
-  return {
-    token: customToken,
-    driver: {
-      name,
-      bizId,
-      staffId,
-      branchId,
-      mobile: cleanPhone
-    }
-  };
 });
 
 /**
@@ -846,23 +711,37 @@ exports.createDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
     }
   }
 
-  const targetStaffId = db.collection('businesses').doc(bizId).collection('staff').doc().id;
-
-  // Create or retrieve Firebase Auth user
   let userRecord;
+  let targetStaffId = db.collection('businesses').doc(bizId).collection('staff').doc().id;
+  let isExistingDriver = false;
   try {
     userRecord = await admin.auth().getUserByEmail(cleanEmail);
-    // User already exists in Firebase Auth
-    if (userRecord.customClaims && userRecord.customClaims.bizId && userRecord.customClaims.bizId !== bizId) {
-      throw new HttpsError('already-exists', 'This email is associated with a different kitchen account.');
+    const claims = userRecord.customClaims || {};
+    const managerSnap = await db.collectionGroup('managers')
+      .where('email', '==', cleanEmail).limit(1).get();
+    const isKnownOwnerOrManager = userRecord.uid === bizId ||
+      claims.role === 'owner' ||
+      claims.role === 'manager' ||
+      !managerSnap.empty;
+    isExistingDriver = claims.role === 'driver' && claims.bizId === bizId && Boolean(claims.staffId);
+
+    if (isKnownOwnerOrManager || !isExistingDriver) {
+      throw new HttpsError(
+        'already-exists',
+        'This email already belongs to an account. Use a new email address or edit the existing delivery partner.'
+      );
     }
-    // Update existing user with new password & claims
+
+    targetStaffId = String(claims.staffId);
     await admin.auth().updateUser(userRecord.uid, {
       password: cleanPassword,
       displayName: cleanName,
       disabled: !isActive
     });
   } catch (err) {
+    if (err instanceof HttpsError) {
+      throw err;
+    }
     if (err.code === 'auth/user-not-found') {
       userRecord = await admin.auth().createUser({
         email: cleanEmail,
@@ -870,8 +749,6 @@ exports.createDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
         displayName: cleanName,
         disabled: !isActive
       });
-    } else if (err instanceof HttpsError) {
-      throw err;
     } else {
       console.error('[createDeliveryBoyAccount] Auth create error:', err);
       throw new HttpsError('internal', `Failed to configure delivery partner credentials: ${err.message}`);
@@ -880,7 +757,6 @@ exports.createDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
 
   const authUid = userRecord.uid;
 
-  // Set custom claims for role-based authorization
   await admin.auth().setCustomUserClaims(authUid, {
     role: 'driver',
     bizId,
@@ -1184,12 +1060,21 @@ exports.resetDeliveryBoyPassword = onCall({ cors: true }, async (request) => {
       const userRec = await admin.auth().getUserByEmail(staffData.email);
       authUid = userRec.uid;
       await staffRef.update({ authUid });
-    } catch (e) {}
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        throw new HttpsError('not-found', 'Delivery partner Firebase account not found.');
+      }
+      console.error('[resetDeliveryBoyPassword] Could not resolve delivery partner Auth account:', error);
+      throw new HttpsError('internal', 'Unable to resolve the delivery partner account. Please try again.');
+    }
   }
 
-  if (authUid) {
-    await admin.auth().updateUser(authUid, { password: cleanPassword });
+  if (!authUid) {
+    throw new HttpsError('failed-precondition', 'Delivery partner is not linked to a Firebase Auth account.');
   }
+
+  await admin.auth().updateUser(authUid, { password: cleanPassword });
+  await admin.auth().revokeRefreshTokens(authUid);
 
   // Update server-side staff_credentials
   const passwordHash = bcrypt.hashSync(cleanPassword, 10);
@@ -1230,12 +1115,13 @@ exports.deactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
   const nowIso = new Date().toISOString();
 
   if (authUid) {
-    await admin.auth().updateUser(authUid, { disabled: true }).catch(() => {});
-    await db.collection('driver_profiles').doc(authUid).update({
+    await admin.auth().updateUser(authUid, { disabled: true });
+    await admin.auth().revokeRefreshTokens(authUid);
+    await db.collection('driver_profiles').doc(authUid).set({
       active: false,
       status: 'Inactive',
       updatedAt: nowIso
-    }).catch(() => {});
+    }, { merge: true });
   }
 
   await staffRef.update({
@@ -1245,11 +1131,11 @@ exports.deactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
   });
 
   if (staffData.email) {
-    await db.collection('driver_auth_lookup_email').doc(staffData.email).update({
+    await db.collection('driver_auth_lookup_email').doc(staffData.email).set({
       active: false,
       status: 'Inactive',
       updatedAt: nowIso
-    }).catch(() => {});
+    }, { merge: true });
   }
 
   return { success: true };
@@ -1280,14 +1166,16 @@ exports.reactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
   const authUid = staffData.authUid;
   const nowIso = new Date().toISOString();
 
-  if (authUid) {
-    await admin.auth().updateUser(authUid, { disabled: false }).catch(() => {});
-    await db.collection('driver_profiles').doc(authUid).update({
-      active: true,
-      status: 'Active',
-      updatedAt: nowIso
-    }).catch(() => {});
+  if (!authUid) {
+    throw new HttpsError('failed-precondition', 'Delivery partner is not linked to a Firebase Auth account.');
   }
+
+  await admin.auth().updateUser(authUid, { disabled: false });
+  await db.collection('driver_profiles').doc(authUid).set({
+    active: true,
+    status: 'Active',
+    updatedAt: nowIso
+  }, { merge: true });
 
   await staffRef.update({
     active: true,
@@ -1296,11 +1184,11 @@ exports.reactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
   });
 
   if (staffData.email) {
-    await db.collection('driver_auth_lookup_email').doc(staffData.email).update({
+    await db.collection('driver_auth_lookup_email').doc(staffData.email).set({
       active: true,
       status: 'Active',
       updatedAt: nowIso
-    }).catch(() => {});
+    }, { merge: true });
   }
 
   return { success: true };

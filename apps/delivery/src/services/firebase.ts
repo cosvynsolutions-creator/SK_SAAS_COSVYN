@@ -23,6 +23,9 @@ import {
 import {
   initializeFirestore,
   memoryLocalCache,
+  persistentLocalCache,
+  persistentSingleTabManager,
+  getFirestore,
   setLogLevel,
   Firestore
 } from 'firebase/firestore';
@@ -65,10 +68,18 @@ export const auth = (() => {
 export const db: Firestore = (() => {
   try {
     return initializeFirestore(app, {
-      localCache: memoryLocalCache()
+      localCache: persistentLocalCache({
+        tabManager: persistentSingleTabManager({})
+      })
     });
   } catch {
-    return initializeFirestore(app, {});
+    try {
+      return initializeFirestore(app, {
+        localCache: memoryLocalCache({})
+      });
+    } catch {
+      return getFirestore(app);
+    }
   }
 })();
 
@@ -89,7 +100,7 @@ export interface DriverLoginResponse {
 }
 
 export const driverLoginCallable = httpsCallable<
-  { email?: string; password?: string; phone?: string; pin?: string; bizId?: string },
+  { email: string; password: string; bizId?: string },
   DriverLoginResponse
 >(functions, 'driverLogin');
 
@@ -101,19 +112,14 @@ export interface DriverClaims {
   branchId?: string;
 }
 
-export const getDriverClaims = async (user: User): Promise<DriverClaims | null> => {
-  try {
-    const idTokenResult = await user.getIdTokenResult(true);
-    return {
-      role: idTokenResult.claims.role as string | undefined,
-      bizId: idTokenResult.claims.bizId as string | undefined,
-      staffId: idTokenResult.claims.staffId as string | undefined,
-      branchId: idTokenResult.claims.branchId as string | undefined,
-    };
-  } catch (err) {
-    console.warn("Could not retrieve driver claims:", err);
-    return null;
-  }
+export const getDriverClaims = async (user: User): Promise<DriverClaims> => {
+  const idTokenResult = await user.getIdTokenResult(true);
+  return {
+    role: idTokenResult.claims.role as string | undefined,
+    bizId: idTokenResult.claims.bizId as string | undefined,
+    staffId: idTokenResult.claims.staffId as string | undefined,
+    branchId: idTokenResult.claims.branchId as string | undefined,
+  };
 };
 
 export {
