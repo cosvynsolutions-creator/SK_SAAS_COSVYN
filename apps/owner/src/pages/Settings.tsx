@@ -1088,7 +1088,17 @@ const Settings = () => {
         });
       } catch (error) {
         console.error('Manager account save failed:', error);
-        setSaveError(error instanceof Error ? error.message : 'Could not save manager account. Check your connection and try again.');
+        const code = typeof error === 'object' && error && 'code' in error
+          ? String(error.code)
+          : '';
+        const message = error instanceof Error ? error.message : '';
+        if (code === 'functions/internal' || message === 'INTERNAL') {
+          setSaveError(
+            'The manager credential Function returned INTERNAL. Check Firebase Functions logs for setManagerPassword. If they show Firestore PERMISSION_DENIED, the old Function revision is still serving requests; deploy the updated Function before retrying.'
+          );
+        } else {
+          setSaveError(message || `Could not save manager account${code ? ` (${code})` : ''}. Check your connection and retry.`);
+        }
       } finally {
         setSaving(false);
       }
