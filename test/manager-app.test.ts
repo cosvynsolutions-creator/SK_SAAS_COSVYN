@@ -39,75 +39,57 @@ describe('ScaleKitchen Manager App — Phase 4.1 Security Hardening Test Suite',
       expect(normalizePhone('98765-43210')).toBe('9876543210');
     });
 
-    it('should validate email format and presence before network invocation', () => {
-      const validate = (email: string, pass: string, biz: string) => {
+    it('should validate email and password before Firebase Authentication sign-in', () => {
+      const validate = (email: string, pass: string) => {
         const cleanEmail = normalizeEmail(email);
-        if (!biz?.trim()) return 'Missing business ID';
         if (!cleanEmail || !cleanEmail.includes('@')) return 'Invalid email';
         if (!pass) return 'Missing password';
         return null;
       };
 
-      expect(validate('', 'pass123', 'biz1')).toBe('Invalid email');
-      expect(validate('not-an-email', 'pass123', 'biz1')).toBe('Invalid email');
-      expect(validate('mgr@kitchen.com', '', 'biz1')).toBe('Missing password');
-      expect(validate('mgr@kitchen.com', 'pass123', '')).toBe('Missing business ID');
-      expect(validate('mgr@kitchen.com', 'pass123', 'biz1')).toBeNull();
+      expect(validate('', 'pass123')).toBe('Invalid email');
+      expect(validate('not-an-email', 'pass123')).toBe('Invalid email');
+      expect(validate('mgr@kitchen.com', '')).toBe('Missing password');
+      expect(validate('mgr@kitchen.com', 'pass123')).toBeNull();
     });
   });
 
-  describe('3. Strict Business Resolution (Tenant Spoofing Prevention)', () => {
-    it('should reject manager lookup in other businesses when specific bizId is supplied', () => {
-      const resolveManagerDoc = (
-        suppliedBizId: string,
-        email: string,
-        database: Record<string, { managers: Array<{ id: string; email: string }> }>
-      ) => {
-        if (suppliedBizId && suppliedBizId.trim()) {
-          const biz = database[suppliedBizId.trim()];
-          if (!biz) return null; // Business does not exist
-          const found = biz.managers.find(m => m.email === email);
-          return found ? { doc: found, bizId: suppliedBizId.trim() } : null; // Strictly within that biz!
-        }
-        return null;
+  describe('3. Firebase Auth Account Provisioning', () => {
+    it('should bind a manager profile to the UID and tenant from verified custom claims', () => {
+      const user = { uid: 'firebase-auth-uid-1', email: 'manager@kitchen.com' };
+      const claims = {
+        role: 'manager',
+        bizId: 'kitchen-1',
+        managerId: 'manager-doc-1',
+        branchId: 'branch-1',
+        allBranches: false
+      };
+      const profile = {
+        authUid: user.uid,
+        email: user.email,
+        id: claims.managerId
       };
 
-      const mockDb = {
-        victim_kitchen: { managers: [] },
-        attacker_kitchen: { managers: [{ id: 'mgr_evil', email: 'evil@kitchen.com' }] }
-      };
-
-      // Attacker supplies victim_kitchen bizId with their evil@kitchen.com email
-      const result = resolveManagerDoc('victim_kitchen', 'evil@kitchen.com', mockDb);
-      // MUST NOT fall back to attacker_kitchen! Must be null!
-      expect(result).toBeNull();
+      expect(claims.role).toBe('manager');
+      expect(profile.authUid).toBe(user.uid);
+      expect(profile.id).toBe(claims.managerId);
+      expect(claims.bizId).toBe('kitchen-1');
+      expect(claims.branchId).toBe('branch-1');
     });
 
-    it('should reject ambiguous manager email across multiple businesses when bizId is omitted', () => {
-      const resolveWithoutBizId = (
-        email: string,
-        database: Record<string, { managers: Array<{ id: string; email: string }> }>
-      ) => {
-        const matches: Array<{ doc: any; bizId: string }> = [];
-        for (const [bizId, data] of Object.entries(database)) {
-          for (const m of data.managers) {
-            if (m.email === email) {
-              matches.push({ doc: m, bizId });
-            }
-          }
-        }
-        if (matches.length === 0) return { status: 'not_found' };
-        if (matches.length > 1) return { status: 'ambiguous' };
-        return { status: 'resolved', match: matches[0] };
-      };
+    it('should reject reusing an existing account that is not already this manager', () => {
+      const mayLinkAccount = (
+        accountClaims: { role?: string; bizId?: string; managerId?: string },
+        bizId: string,
+        managerId: string
+      ) => accountClaims.role === 'manager' &&
+        accountClaims.bizId === bizId &&
+        accountClaims.managerId === managerId;
 
-      const mockDb = {
-        kitchen_1: { managers: [{ id: 'm1', email: 'common@kitchen.com' }] },
-        kitchen_2: { managers: [{ id: 'm2', email: 'common@kitchen.com' }] }
-      };
-
-      const result = resolveWithoutBizId('common@kitchen.com', mockDb);
-      expect(result.status).toBe('ambiguous');
+      expect(mayLinkAccount({ role: 'owner', bizId: 'kitchen-1' }, 'kitchen-1', 'manager-1')).toBe(false);
+      expect(mayLinkAccount({ role: 'driver', bizId: 'kitchen-1' }, 'kitchen-1', 'manager-1')).toBe(false);
+      expect(mayLinkAccount({ role: 'manager', bizId: 'kitchen-2', managerId: 'manager-1' }, 'kitchen-1', 'manager-1')).toBe(false);
+      expect(mayLinkAccount({ role: 'manager', bizId: 'kitchen-1', managerId: 'manager-1' }, 'kitchen-1', 'manager-1')).toBe(true);
     });
   });
 
@@ -132,20 +114,22 @@ describe('ScaleKitchen Manager App — Phase 4.1 Security Hardening Test Suite',
     });
   });
 
-  describe('5. Custom Token Claims Verification & Security Boundary', () => {
-    it('should verify expected claims structure for manager token', () => {
+  describe('5. Firebase ID Token Claims Verification & Security Boundary', () => {
+    it('should verify manager role, tenant, branch and page claims', () => {
       const mockClaims = {
         role: 'manager',
         bizId: 'kitchen_biz_999',
         managerId: 'staff_doc_123',
         branchId: 'branch_south_hub',
-        allBranches: false
+        allBranches: false,
+        allowedPages: ['dashboard', 'deliveries']
       };
 
       expect(mockClaims.role).toBe('manager');
       expect(mockClaims.bizId).toBe('kitchen_biz_999');
       expect(mockClaims.branchId).toBe('branch_south_hub');
       expect(mockClaims.allBranches).toBe(false);
+      expect(mockClaims.allowedPages).toContain('deliveries');
     });
 
     it('should set allBranches: true when branchId is "All"', () => {
@@ -358,7 +342,7 @@ describe('ScaleKitchen Manager App — Phase 4.1 Security Hardening Test Suite',
   });
 
   describe('12. Session Isolation & Logout Cleanup', () => {
-    it('should verify clear storage keys on logout', () => {
+    it('should clear cached manager routing data on logout', () => {
       const mockStorage: Record<string, string> = {
         manager_data: JSON.stringify({ id: 'm1' }),
         manager_branch_id: 'b1',
@@ -370,13 +354,14 @@ describe('ScaleKitchen Manager App — Phase 4.1 Security Hardening Test Suite',
         delete storage['manager_data'];
         delete storage['manager_branch_id'];
         delete storage['manager_session_log_id'];
+        delete storage['manager_biz_id'];
       };
 
       logoutCleanup(mockStorage);
       expect(mockStorage.manager_data).toBeUndefined();
       expect(mockStorage.manager_branch_id).toBeUndefined();
       expect(mockStorage.manager_session_log_id).toBeUndefined();
-      expect(mockStorage.manager_biz_id).toBe('biz_abc');
+      expect(mockStorage.manager_biz_id).toBeUndefined();
     });
   });
 });

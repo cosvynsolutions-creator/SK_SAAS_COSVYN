@@ -115,6 +115,17 @@ const ManagerAppInner: React.FC = () => {
     }
   }, [allowedPages]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-sm font-medium text-slate-200">
+          <Loader2 size={20} className="animate-spin text-indigo-300" />
+          <span>Verifying manager account...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Manager Login Screen
   if (!loggedInManager) {
     const handleLogin = async (e: React.FormEvent) => {

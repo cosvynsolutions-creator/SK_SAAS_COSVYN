@@ -796,7 +796,10 @@ export interface BranchManager {
   branchId: string; // Specific branch id or 'All'
   allowedPages: string[]; // Page keys e.g. ['dashboard', 'customers', ...]
   email: string;
-  password: string;
+  authUid?: string;
+  password?: string;
+  status?: string;
+  active?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

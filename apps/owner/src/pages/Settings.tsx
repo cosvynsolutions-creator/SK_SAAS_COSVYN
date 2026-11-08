@@ -20,21 +20,13 @@ import {
   reactivateDeliveryBoyAccountCallable, 
   setDriverPasswordCallable, 
   setManagerPasswordCallable, 
+  deleteManagerAccountCallable,
   deleteDriverCallable,
   migrateCredentialsCallable
 } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { VegNonVegBadge, VegNonVegIcon, DayDietScheduleSelector } from '../components/VegNonVegIndicator';
 import { getPlanDietSummaryLabel, DietType, PlanDietPreference } from '../services/store';
-import bcrypt from 'bcryptjs';
-
-/**
- * TEMPORARY MIGRATION FLAG:
- * Kept strictly for backward compatibility during Phase 1 deployment transition.
- * REMOVAL CRITERIA: Once Cloud Functions (firebase deploy --only functions) are deployed
- * and migratePlaintextCredentials has run, set this to false and remove the fallback branch.
- */
-const ENABLE_LEGACY_CLIENT_AUTH_FALLBACK = true;
 
 // --- Types ---
 interface Branch { 
@@ -347,50 +339,31 @@ const Settings = () => {
   };
 
   const handleSaveManager = async (data: Omit<BranchManager, 'id'>) => {
-    if (!currentUser) return;
-    const rawPassword = (data as any).password;
-    // SECURITY (Phase 1): Remove plaintext password from client doc write
-    const { password: _omitPassword, ...managerFieldsWithoutPassword } = data as any;
-    let managerId = editingItem?.id;
+    if (!currentUser) throw new Error('Your owner session has expired. Sign in again and retry.');
+    const { password, ...managerFields } = data;
+    const cleanPassword = password?.trim() || '';
 
-    if (editingItem) {
-      await updateItem(currentUser.uid, 'managers', editingItem.id, {
-        ...managerFieldsWithoutPassword,
-        updatedAt: new Date().toISOString()
+    let result;
+    if (editingItem?.id) {
+      result = await setManagerPasswordCallable({
+        bizId: currentUser.uid,
+        managerId: editingItem.id,
+        password: cleanPassword,
+        managerData: managerFields
       });
     } else {
-      const addedDoc = await addItem(currentUser.uid, 'managers', {
-        ...managerFieldsWithoutPassword,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      if (!cleanPassword) throw new Error('A password is required for a new manager account.');
+      result = await setManagerPasswordCallable({
+        bizId: currentUser.uid,
+        password: cleanPassword,
+        managerData: {
+          ...managerFields,
+          createdAt: new Date().toISOString()
+        }
       });
-      managerId = (addedDoc as any)?.id;
     }
 
-    // Call server-side callable to hash password securely and update passwordHash
-    let callableSucceeded = false;
-    if (rawPassword) {
-      try {
-        await setManagerPasswordCallable({
-          bizId: currentUser.uid,
-          managerId: managerId || editingItem?.id || '',
-          password: rawPassword,
-          managerData: managerFieldsWithoutPassword
-        });
-        callableSucceeded = true;
-      } catch (callableErr) {
-        console.warn("setManagerPassword callable warning:", callableErr);
-      }
-    }
-
-    // TEMPORARY MIGRATION FALLBACK: Only used before Cloud Functions deployment
-    if (!callableSucceeded && ENABLE_LEGACY_CLIENT_AUTH_FALLBACK && rawPassword && editingItem) {
-      console.warn("[Migration Fallback] Writing temporary manager password until Cloud Functions are deployed.");
-      await updateItem(currentUser.uid, 'managers', editingItem.id, {
-        password: rawPassword
-      }).catch(() => {});
-    }
-
+    if (result.data.warning) window.alert(result.data.warning);
     setActiveModal(null);
     setEditingItem(null);
   };
@@ -434,6 +407,15 @@ const Settings = () => {
 
   const handleDelete = async (collection: string, id: string) => {
     if(!currentUser || !window.confirm("Are you sure? This cannot be undone.")) return;
+    if (collection === 'managers') {
+      try {
+        await deleteManagerAccountCallable({ bizId: currentUser.uid, managerId: id });
+      } catch (error) {
+        console.error('Could not delete manager account:', error);
+        window.alert('Could not delete manager account. Check your connection and Firebase Functions logs, then retry.');
+      }
+      return;
+    }
     if (collection === 'staff') {
       const boy = deliveryBoys.find(b => b.id === id);
       const cleanPhone = (boy?.mobile || '').replace(/\D/g, '').slice(-10);
@@ -1015,10 +997,12 @@ const Settings = () => {
         ? initialData.allowedPages 
         : ['dashboard', 'prep', 'deliveries', 'customers', 'notes', 'inventory'],
       email: initialData?.email || '',
-      password: initialData?.password || ''
+      password: ''
     });
 
     const [showPass, setShowPass] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
     const togglePage = (pageId: string) => {
       const current = formData.allowedPages || [];
@@ -1037,26 +1021,44 @@ const Settings = () => {
       setFormData({ ...formData, allowedPages: ['dashboard'] });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!formData.name?.trim() || !formData.mobile?.trim() || !formData.email?.trim() || !formData.password?.trim()) {
-        alert("Please fill in Manager Name, Mobile, Email, and Password.");
+      const cleanPassword = formData.password?.trim() || '';
+      if (!formData.name?.trim() || !formData.mobile?.trim() || !formData.email?.trim() || (!initialData && !cleanPassword)) {
+        setSaveError('Please fill in Manager Name, Mobile, Email, and Password.');
+        return;
+      }
+      if (initialData && !initialData.authUid && !cleanPassword) {
+        setSaveError('This manager has not been linked to Firebase Authentication yet. Enter a new password to create the secure sign-in.');
+        return;
+      }
+      if (cleanPassword && cleanPassword.length < 6) {
+        setSaveError('Manager password must be at least 6 characters.');
         return;
       }
 
-      handleSaveManager({
-        name: formData.name.trim(),
-        mobile: formData.mobile.trim(),
-        aadharNumber: formData.aadharNumber?.trim() || '',
-        location: formData.location?.trim() || '',
-        salary: Number(formData.salary) || 0,
-        dateOfJoining: formData.dateOfJoining || new Date().toISOString().split('T')[0],
-        homeLocation: formData.homeLocation?.trim() || '',
-        branchId: formData.branchId || 'All',
-        allowedPages: formData.allowedPages && formData.allowedPages.length > 0 ? formData.allowedPages : ['dashboard'],
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password
-      });
+      setSaving(true);
+      setSaveError('');
+      try {
+        await handleSaveManager({
+          name: formData.name.trim(),
+          mobile: formData.mobile.trim(),
+          aadharNumber: formData.aadharNumber?.trim() || '',
+          location: formData.location?.trim() || '',
+          salary: Number(formData.salary) || 0,
+          dateOfJoining: formData.dateOfJoining || new Date().toISOString().split('T')[0],
+          homeLocation: formData.homeLocation?.trim() || '',
+          branchId: formData.branchId || 'All',
+          allowedPages: formData.allowedPages && formData.allowedPages.length > 0 ? formData.allowedPages : ['dashboard'],
+          email: formData.email.trim().toLowerCase(),
+          password: cleanPassword
+        });
+      } catch (error) {
+        console.error('Manager account save failed:', error);
+        setSaveError(error instanceof Error ? error.message : 'Could not save manager account. Check your connection and try again.');
+      } finally {
+        setSaving(false);
+      }
     };
 
     return (
@@ -1276,9 +1278,9 @@ const Settings = () => {
                   </label>
                   <div className="relative">
                     <input 
-                      required 
+                      required={!initialData}
                       type={showPass ? 'text' : 'password'}
-                      placeholder="Enter strong password" 
+                      placeholder={initialData ? "Leave blank to keep current password" : "Enter strong password"}
                       value={formData.password || ''} 
                       className="w-full p-2 pr-8 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-400 outline-none text-xs font-mono" 
                       onChange={e => setFormData({...formData, password: e.target.value})} 
@@ -1295,13 +1297,20 @@ const Settings = () => {
               </div>
             </div>
 
+            {saveError && (
+              <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                {saveError}
+              </p>
+            )}
+
             <div className="pt-2">
               <button 
                 type="submit" 
+                disabled={saving}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
               >
-                <Check size={16} />
-                <span>{initialData ? 'Update Manager Profile & Permissions' : 'Save Manager & Generate Access Link'}</span>
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                <span>{saving ? 'Saving Manager...' : initialData ? 'Update Manager Profile & Permissions' : 'Save Manager & Generate Access Link'}</span>
               </button>
             </div>
           </form>

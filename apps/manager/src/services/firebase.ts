@@ -14,7 +14,7 @@ import {
   browserSessionPersistence,
   inMemoryPersistence,
   indexedDBLocalPersistence,
-  signInWithCustomToken,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User
@@ -74,24 +74,6 @@ export const db: Firestore = (() => {
 // Initialize Functions on the isolated named app
 export const functions = getFunctions(app, 'asia-south1');
 
-// Server-verified manager login callable contract
-export interface ManagerLoginResponse {
-  token: string;
-  manager: {
-    id: string;
-    name: string;
-    email: string;
-    branchId: string;
-    allowedPages: string[];
-    bizId: string;
-  };
-}
-
-export const managerLoginCallable = httpsCallable<
-  { email: string; password: string; bizId?: string },
-  ManagerLoginResponse
->(functions, 'managerLogin');
-
 export const setDriverPasswordCallable = httpsCallable<
   {
     bizId: string;
@@ -107,33 +89,32 @@ export const setDriverPasswordCallable = httpsCallable<
   { success: boolean; staffId: string }
 >(functions, 'setDriverPassword');
 
-// Helper to inspect custom token claims for tenant isolation
+// Read server-assigned Firebase ID token claims for tenant isolation.
 export interface ManagerClaims {
   role?: string;
   bizId?: string;
   managerId?: string;
   branchId?: string;
   allBranches?: boolean;
+  allowedPages?: string[];
 }
 
-export const getManagerClaims = async (user: User): Promise<ManagerClaims | null> => {
-  try {
-    const idTokenResult = await user.getIdTokenResult(true);
-    return {
-      role: idTokenResult.claims.role as string | undefined,
-      bizId: idTokenResult.claims.bizId as string | undefined,
-      managerId: idTokenResult.claims.managerId as string | undefined,
-      branchId: idTokenResult.claims.branchId as string | undefined,
-      allBranches: (idTokenResult.claims.allBranches as boolean | undefined) || (idTokenResult.claims.branchId === 'All'),
-    };
-  } catch (err) {
-    console.warn("Could not retrieve manager claims:", err);
-    return null;
-  }
+export const getManagerClaims = async (user: User): Promise<ManagerClaims> => {
+  const idTokenResult = await user.getIdTokenResult(true);
+  return {
+    role: idTokenResult.claims.role as string | undefined,
+    bizId: idTokenResult.claims.bizId as string | undefined,
+    managerId: idTokenResult.claims.managerId as string | undefined,
+    branchId: idTokenResult.claims.branchId as string | undefined,
+    allBranches: (idTokenResult.claims.allBranches as boolean | undefined) || (idTokenResult.claims.branchId === 'All'),
+    allowedPages: Array.isArray(idTokenResult.claims.allowedPages)
+      ? idTokenResult.claims.allowedPages as string[]
+      : undefined
+  };
 };
 
 export {
-  signInWithCustomToken,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
 };

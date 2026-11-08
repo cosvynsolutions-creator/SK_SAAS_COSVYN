@@ -7,7 +7,8 @@ service cloud.firestore {
     // =========================================================================
     // Key principles:
     // 1. Browser NEVER directly modifies subscription, payments, or sensitive tenant data
-    // 2. Drivers and Managers authenticate via callable, receive custom token with claims
+    // 2. Drivers and Managers use Firebase Authentication; trusted callables
+    //    provision their custom claims before allowing tenant access.
     // 3. All tenant data scoped by businessId; custom claims enforce per-request access
     // 4. Plaintext data (PINs, passwords) never leave Cloud Functions
     // =========================================================================
@@ -38,7 +39,7 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == bizId;
     }
 
-    // 3. Delivery Driver check: custom token claim validates role + bizId
+    // 3. Delivery Driver check: verified ID token claim validates role + bizId
     //    Driver can only act within their assigned business
     function isTenantDriver(bizId) {
       return request.auth != null && 
@@ -56,15 +57,22 @@ service cloud.firestore {
              request.auth.token.staffId.size() > 0;
     }
 
-    // 4. Branch Manager check: custom token claim validates role + bizId
-    //    Manager can only act within their assigned business
+    // 4. Branch Manager check: verified ID token claims must match an active
+    //    manager profile, so deactivation/deletion blocks existing tokens too.
     function isTenantManager(bizId) {
       return request.auth != null && 
              request.auth.token != null &&
              'role' in request.auth.token && 
              request.auth.token.role == 'manager' &&
              'bizId' in request.auth.token && 
-             request.auth.token.bizId == bizId;
+             request.auth.token.bizId == bizId &&
+             'managerId' in request.auth.token &&
+             request.auth.token.managerId is string &&
+             request.auth.token.managerId.size() > 0 &&
+             exists(/databases/$(database)/documents/businesses/$(bizId)/managers/$(request.auth.token.managerId)) &&
+             get(/databases/$(database)/documents/businesses/$(bizId)/managers/$(request.auth.token.managerId)).data.authUid == request.auth.uid &&
+             get(/databases/$(database)/documents/businesses/$(bizId)/managers/$(request.auth.token.managerId)).data.active == true &&
+             get(/databases/$(database)/documents/businesses/$(bizId)/managers/$(request.auth.token.managerId)).data.branchId == request.auth.token.branchId;
     }
 
     // 5. Manager All-Branches check: manager with 'All' branch scope

@@ -111,7 +111,23 @@ describe('ScaleKitchen Firestore Security Rules Test Suite', () => {
         name: 'Manager Mike',
         email: 'mike@kitchenalpha.com',
         branchId: 'branch_1',
+        authUid: 'mgr_uid_1',
+        active: true,
         passwordHash: '$2a$10$hashedpassword123'
+      });
+      await setDoc(doc(db, 'businesses/biz_a/managers/mgr_2'), {
+        name: 'Manager Two',
+        email: 'two@kitchenalpha.com',
+        branchId: 'branch_2',
+        authUid: 'mgr_uid_2',
+        active: true
+      });
+      await setDoc(doc(db, 'businesses/biz_a/managers/mgr_all'), {
+        name: 'All Branch Manager',
+        email: 'all@kitchenalpha.com',
+        branchId: 'All',
+        authUid: 'mgr_uid_all',
+        active: true
       });
 
       await setDoc(doc(db, 'businesses/biz_a/driver_manifest/driver_1'), {
@@ -446,9 +462,9 @@ describe('ScaleKitchen Firestore Security Rules Test Suite', () => {
   });
 
   // =========================================================================
-  // 5. MANAGER ROLE (Custom Token Claims)
+  // 5. MANAGER ROLE (Firebase ID Token Claims)
   // =========================================================================
-  describe('Manager Role with Custom Claims & Branch Isolation', () => {
+  describe('Manager Role with Firebase Claims & Branch Isolation', () => {
     const managerBranch1Context = () => testEnv.authenticatedContext('mgr_uid_1', {
       role: 'manager',
       bizId: 'biz_a',
@@ -604,6 +620,20 @@ describe('ScaleKitchen Firestore Security Rules Test Suite', () => {
       const db = managerBranch1Context().firestore();
       await assertFails(getDoc(doc(db, 'businesses/biz_b/customers/cust_b1')));
       await assertFails(getDoc(doc(db, 'businesses/biz_b/plans/plan_b1')));
+    });
+
+    it('Inactive manager profile blocks access while an old ID token still carries manager claims', async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await updateDoc(doc(context.firestore(), 'businesses/biz_a/managers/mgr_1'), { active: false });
+      });
+      await assertFails(getDoc(doc(managerBranch1Context().firestore(), 'businesses/biz_a/customers/cust_1')));
+    });
+
+    it('Deleted manager profile blocks access while an old ID token still carries manager claims', async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await deleteDoc(doc(context.firestore(), 'businesses/biz_a/managers/mgr_1'));
+      });
+      await assertFails(getDoc(doc(managerBranch1Context().firestore(), 'businesses/biz_a/customers/cust_1')));
     });
 
     it('Manager CAN record their own login/logout logs in manager_logs', async () => {

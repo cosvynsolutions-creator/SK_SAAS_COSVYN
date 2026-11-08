@@ -51,11 +51,6 @@ export const driverLoginCallable = httpsCallable<
   { token: string; driver: { name: string; bizId: string; staffId: string; branchId: string; mobile: string } }
 >(functions, 'driverLogin');
 
-export const managerLoginCallable = httpsCallable<
-  { email: string; password: string; bizId?: string },
-  { token: string; manager: { id: string; name: string; email: string; branchId: string; allowedPages: string[]; bizId: string } }
->(functions, 'managerLogin');
-
 export interface CreateDeliveryBoyAccountPayload {
   bizId: string;
   email: string;
@@ -122,9 +117,28 @@ export const setDriverPasswordCallable = httpsCallable<
 >(functions, 'setDriverPassword');
 
 export const setManagerPasswordCallable = httpsCallable<
-  { bizId: string; managerId?: string; password: string; managerData: any },
-  { success: boolean; managerId: string }
+  { bizId: string; managerId?: string; password: string; managerData: ManagerAccountData },
+  { success: boolean; managerId: string; authUid: string; warning?: string }
 >(functions, 'setManagerPassword');
+
+export interface ManagerAccountData {
+  name: string;
+  email: string;
+  branchId: string;
+  allowedPages: string[];
+  mobile?: string;
+  aadharNumber?: string;
+  location?: string;
+  salary?: number;
+  dateOfJoining?: string;
+  homeLocation?: string;
+  createdAt?: string;
+}
+
+export const deleteManagerAccountCallable = httpsCallable<
+  { bizId: string; managerId: string },
+  { success: boolean }
+>(functions, 'deleteManagerAccount');
 
 export const migrateCredentialsCallable = httpsCallable<
   Record<string, never>,
