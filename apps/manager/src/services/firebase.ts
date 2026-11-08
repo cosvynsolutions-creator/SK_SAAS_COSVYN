@@ -88,7 +88,7 @@ export interface ManagerLoginResponse {
 }
 
 export const managerLoginCallable = httpsCallable<
-  { email: string; password: string; bizId: string },
+  { email: string; password: string; bizId?: string },
   ManagerLoginResponse
 >(functions, 'managerLogin');
 

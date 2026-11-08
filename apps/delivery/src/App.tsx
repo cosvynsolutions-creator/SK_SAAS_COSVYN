@@ -36,6 +36,7 @@ export const App: React.FC = () => {
   const [authInitializing, setAuthInitializing] = useState<boolean>(true);
   const [selectedMeal, setSelectedMeal] = useState<MealSession>(() => getDefaultMealSessionForTime());
   const [isDriverMealManuallySelected, setIsDriverMealManuallySelected] = useState<boolean>(false);
+  const [activePage, setActivePage] = useState<'route' | 'shift'>('route');
   const [todayStr, setTodayStr] = useState<string>(getTodayStr);
 
   useEffect(() => {
@@ -1019,8 +1020,8 @@ export const App: React.FC = () => {
   // If no authenticated driver claims are available, display the email/password login.
   if (!bizId || !selectedBoyId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-white flex items-center justify-center p-4">
-        <div className="glass-card bg-white/10 backdrop-blur-xl p-6 sm:p-8 rounded-3xl max-w-md w-full border border-white/20 text-center space-y-5 shadow-2xl">
+      <div className="min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-white flex items-center justify-center p-4">
+        <div className="glass-card bg-white/10 backdrop-blur-xl p-6 sm:p-8 rounded-3xl max-w-md w-full min-w-0 border border-white/20 text-center space-y-5 shadow-2xl">
           <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto shadow-inner">
             <Truck size={32} />
           </div>
@@ -1125,189 +1126,81 @@ export const App: React.FC = () => {
               )}
             </button>
           </form>
-
+          <p className="pt-1 text-[11px] text-slate-500">
+            Scale Kitchen by Cosvyn Solutions
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-slate-100 flex flex-col font-sans pb-24">
-      {/* Top Mobile Bar */}
-      <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-xl border-b border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between shadow-glass">
-        
-        {/* Left: Driver info and live status */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
-            <Truck size={17} />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-bold font-display text-xs sm:text-sm tracking-tight text-white truncate max-w-[90px] sm:max-w-none">
-                {currentBoy ? currentBoy.name : driverDisplayName || 'Select Driver'}
+    <div className="min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-slate-100 flex flex-col font-sans pb-24">
+      <header className="sticky top-0 z-40 w-full min-w-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 px-4 py-2.5 shadow-glass">
+        <div className="mx-auto w-full max-w-xl">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold font-display tracking-tight text-white">
+                {currentBoy?.name || driverDisplayName || 'Delivery Partner'}
               </h1>
-              {isShiftActive && (
-                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.2 rounded-full animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live
-                </span>
-              )}
+              <p className="text-[11px] text-slate-400">{formatDateDDMMYYYY(todayStr)}</p>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1">
-              <span>{formatDateDDMMYYYY(todayStr)}</span>
-              <span>•</span>
-              <button 
-                onClick={() => setLoginModalOpen(true)} 
-                className="text-amber-400 hover:underline font-medium"
-              >
-                Change
-              </button>
-            </p>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={`${businessName} Logo`}
+                className="h-9 w-9 shrink-0 rounded-xl border border-white/20 bg-white/10 object-contain p-0.5"
+              />
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 text-xs font-bold text-amber-300">
+                {businessName?.charAt(0) || 'K'}
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Center: Business Name */}
-        <div className="flex-1 text-center px-1 sm:px-3">
-          <h2 className="font-bold font-display text-xs sm:text-sm tracking-tight text-white truncate max-w-[110px] sm:max-w-xs mx-auto">
+          <h2 className="mt-1 max-w-full truncate text-center text-sm font-bold font-display text-white" title={businessName}>
             {businessName || 'ScaleKitchen'}
           </h2>
-          <span className="text-[9px] text-amber-400/90 font-medium hidden sm:inline-block">
-            Delivery Fleet
-          </span>
-        </div>
-
-        {/* Right Corner: Driver Name Badge, Shift Action Button & Company Logo */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {Boolean(currentBoy?.name || driverDisplayName) && (() => {
-            const rawName = currentBoy?.name || driverDisplayName || 'Partner';
-            const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-            return (
-              <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-200 shadow-xs">
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold text-[10px] sm:text-xs border border-amber-400/50 shrink-0">
-                  {displayName.charAt(0)}
-                </div>
-                <div className="text-left leading-none">
-                  <span className="block text-xs font-bold text-amber-100 truncate max-w-[75px] sm:max-w-[130px]">
-                    {displayName}
-                  </span>
-                  <span className="block text-[8px] sm:text-[9px] text-emerald-400 font-semibold mt-0.5">
-                    {isShiftActive ? '● Online' : '○ Standby'}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {isShiftActive ? (
-            <button 
-              onClick={handlePunchOut}
-              className="text-[11px] sm:text-xs font-semibold px-2 sm:px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-xl transition-all active:scale-95 flex items-center gap-1 shadow-xs"
-            >
-              <RotateCcw size={12} /> <span className="hidden sm:inline">End Shift</span>
-            </button>
-          ) : (
-            <button 
-              onClick={handlePunchIn}
-              className="text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl transition-all active:scale-95 shadow-md flex items-center gap-1"
-            >
-              <Check size={13} /> <span className="hidden sm:inline">Punch In</span>
-            </button>
-          )}
-
-          {logoUrl ? (
-            <img 
-              src={logoUrl} 
-              alt={`${businessName} Logo`} 
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain bg-white/10 p-0.5 border border-white/20 shadow-xs shrink-0" 
-            />
-          ) : (
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-              {businessName?.charAt(0) || 'K'}
-            </div>
-          )}
-
-          <button
-            onClick={handleDriverLogout}
-            className="p-1.5 sm:px-2 sm:py-1.5 rounded-xl bg-white/10 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/30 text-xs font-semibold flex items-center gap-1 transition-all"
-            title="Log Out of Delivery App"
-          >
-            <LogOut size={13} />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
         </div>
       </header>
 
+      {toastMessage && (
+        <div className="fixed left-3 right-3 top-20 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border-2 border-amber-300 bg-amber-400 p-3.5 text-xs font-bold text-slate-950 shadow-2xl">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-base">🔔</span>
+            <span className="break-words">{toastMessage}</span>
+          </div>
+          {retryAction && (
+            <button
+              onClick={() => {
+                const retry = retryAction;
+                setRetryAction(null);
+                setToastMessage(null);
+                retry();
+              }}
+              className="shrink-0 rounded-lg bg-slate-950 px-2.5 py-1 text-white"
+            >
+              Retry
+            </button>
+          )}
+          <button onClick={() => setToastMessage(null)} className="shrink-0 rounded-lg p-1 hover:bg-black/10">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-xl w-full mx-auto p-4 space-y-4">
-        
-        {/* Floating Toast Notification */}
-        {toastMessage && (
-          <div className="sticky top-16 z-50 p-3.5 bg-amber-400 text-slate-950 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border-2 border-amber-300 font-bold text-xs animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2">
-              <span className="text-base shrink-0">🔔</span>
-              <span>{toastMessage}</span>
-            </div>
-            {retryAction && (
-              <button
-                onClick={() => {
-                  const retry = retryAction;
-                  setRetryAction(null);
-                  setToastMessage(null);
-                  retry();
-                }}
-                className="px-2.5 py-1 bg-slate-950 text-white rounded-lg"
-              >
-                Retry
-              </button>
-            )}
-            <button 
-              onClick={() => setToastMessage(null)}
-              className="p-1 hover:bg-black/10 rounded-lg text-slate-950 shrink-0"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
+      <main className="mx-auto w-full min-w-0 max-w-xl flex-1 space-y-4 overflow-x-hidden p-4">
+        {activePage === 'route' ? (
+        <>
 
-        {/* Shift Banner when not punched in */}
         {!isShiftActive && (
-          <div className="glass-card bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
-                <Clock size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-amber-300">Shift Not Started</h4>
-                <p className="text-[11px] text-slate-300 mt-0.5">Punch in to activate GPS tracking & record deliveries.</p>
-              </div>
-            </div>
-            <button 
-              onClick={handlePunchIn}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 shadow-sm active:scale-95"
-            >
-              Start Shift
-            </button>
-          </div>
-        )}
-
-        {/* GPS Active Pill */}
-        {isShiftActive && (
-          <div className="glass-card bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 rounded-xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-emerald-300 font-medium">
-              <Navigation size={14} className="animate-spin text-emerald-400" />
-              <span>GPS Tracking Active</span>
-              {punchInTime && <span className="text-slate-400 text-[11px]">(Started at {punchInTime})</span>}
-            </div>
-            {currentCoords && (
-              <a 
-                href={`https://www.google.com/maps?q=${currentCoords.lat},${currentCoords.lng}`} 
-                target="_blank" 
-                rel="noreferrer"
-                className="text-[11px] text-emerald-400 underline font-mono flex items-center gap-1"
-              >
-                Maps Pin <ExternalLink size={10} />
-              </a>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setActivePage('shift')}
+            className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-left text-xs text-amber-200"
+          >
+            Shift not started. Open the <span className="font-bold underline">Shift</span> tab to punch in before delivering.
+          </button>
         )}
 
         {/* Meal Session Filter Tabs */}
@@ -1455,7 +1348,7 @@ export const App: React.FC = () => {
                         }`}
                         title={
                           isBlockedByShift
-                            ? 'Punch in at top of screen before marking delivered'
+                            ? 'Open the Shift tab and punch in before marking delivered'
                             : isBlockedByBox
                               ? 'Select returned box condition below before marking delivered'
                               : isDelivered
@@ -1466,7 +1359,7 @@ export const App: React.FC = () => {
                         {isBlockedByShift ? (
                           <>
                             <span className="text-xs">🔒</span>
-                            <span>Punch In First</span>
+                            <span>Open Shift</span>
                           </>
                         ) : isDelivered ? (
                           <>
@@ -1797,7 +1690,7 @@ export const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div className="grid grid-cols-1 gap-2.5 pt-1">
                 {driverBranch?.hubLocationLink ? (
                   <a
                     href={driverBranch.hubLocationLink}
@@ -1820,14 +1713,6 @@ export const App: React.FC = () => {
                   </a>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handlePunchOut}
-                  className="py-2.5 px-4 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/20 transition-all active:scale-95"
-                >
-                  <CheckCircle2 size={15} className="text-emerald-400" />
-                  <span>Mark Returned & End Shift</span>
-                </button>
               </div>
             </div>
           )}
@@ -1907,7 +1792,113 @@ export const App: React.FC = () => {
             </div>
           )}
         </div>
+        </>
+        ) : (
+          <section className="space-y-4">
+            <div className="glass-card rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delivery partner</p>
+                  <h3 className="mt-1 truncate text-lg font-bold text-white">
+                    {currentBoy?.name || driverDisplayName || 'Delivery Partner'}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-400">{formatDateDDMMYYYY(todayStr)}</p>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                  isShiftActive
+                    ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                    : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                }`}>
+                  {isShiftActive ? 'Shift active' : 'Shift not started'}
+                </span>
+              </div>
+            </div>
+
+            <div className="glass-card space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <h3 className="text-sm font-bold text-white">Attendance & location</h3>
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-slate-400">Punch-in time</span>
+                <span className="text-right font-semibold text-slate-200">
+                  {isShiftActive ? punchInTime || 'Recorded' : 'Not punched in'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-slate-400">GPS tracking</span>
+                <span className={isShiftActive ? 'font-semibold text-emerald-300' : 'text-slate-400'}>
+                  {isShiftActive ? 'Active during shift' : 'Starts after punch-in'}
+                </span>
+              </div>
+              {currentCoords && (
+                <a
+                  href={`https://www.google.com/maps?q=${currentCoords.lat},${currentCoords.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300 underline"
+                >
+                  <Navigation size={13} /> View current location <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+
+            {isShiftActive ? (
+              <button
+                type="button"
+                onClick={handlePunchOut}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 px-4 py-3 text-sm font-bold text-rose-200 transition-colors hover:bg-rose-500/25"
+              >
+                <RotateCcw size={16} /> End Shift
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePunchIn}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-emerald-400"
+              >
+                <Check size={16} /> Punch In & Start Shift
+              </button>
+            )}
+
+            {isShiftActive && (
+              <p className="rounded-xl border border-slate-700 bg-slate-900/50 p-3 text-[11px] leading-relaxed text-slate-400">
+                End your shift after completing deliveries and returning to the branch.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDriverLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10"
+            >
+              <LogOut size={16} /> Log Out
+            </button>
+          </section>
+        )}
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/95 px-4 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-xl">
+        <div className="mx-auto grid w-full max-w-xl grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setActivePage('route')}
+            aria-current={activePage === 'route' ? 'page' : undefined}
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-xs font-bold transition-colors ${
+              activePage === 'route' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:bg-white/5'
+            }`}
+          >
+            <MapPin size={16} /> Deliveries
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePage('shift')}
+            aria-current={activePage === 'shift' ? 'page' : undefined}
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-xl text-xs font-bold transition-colors ${
+              activePage === 'shift' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:bg-white/5'
+            }`}
+          >
+            <Clock size={16} /> Shift
+          </button>
+        </div>
+      </nav>
 
       {/* Delivery Partner Email + Password Login Modal */}
       {loginModalOpen && (

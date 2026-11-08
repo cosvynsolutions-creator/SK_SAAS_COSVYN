@@ -30,7 +30,7 @@ interface ManagerAuthContextType {
   authError: string;
   setBizId: (bizId: string) => void;
   clearAuthError: () => void;
-  login: (email: string, password: string, targetBizId: string) => Promise<BranchManager>;
+  login: (email: string, password: string) => Promise<BranchManager>;
   logout: () => Promise<void>;
 }
 
@@ -222,14 +222,9 @@ export const ManagerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, targetBizId: string): Promise<BranchManager> => {
+  const login = async (email: string, password: string): Promise<BranchManager> => {
     setAuthError('');
     const cleanEmail = normalizeEmail(email);
-    const cleanBizId = targetBizId.trim();
-
-    if (!cleanBizId) {
-      throw new Error("A valid Kitchen / Business ID is required.");
-    }
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error("A valid manager email address is required.");
     }
@@ -237,11 +232,10 @@ export const ManagerAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error("Password is required.");
     }
 
-    // Invoke cloud function with strict business resolution and deactivation check
+    // Resolve the manager's business from the owner-configured email and password.
     const result = await managerLoginCallable({
       email: cleanEmail,
-      password,
-      bizId: cleanBizId
+      password
     });
 
     if (!result?.data?.token) {

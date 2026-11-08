@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Building, UserCheck, Shield, Lock, Mail, Eye, EyeOff,
+  Shield, Lock, Mail, Eye, EyeOff,
   LogOut, CheckCircle, AlertCircle, Loader2, ArrowRight,
   Menu, X, LayoutDashboard, UtensilsCrossed, Truck, Users, FileText,
   ShoppingBag, Archive, MessageSquare, DollarSign, Receipt,
@@ -68,7 +68,6 @@ const VIEW_ICONS: Record<string, React.ComponentType<any>> = {
 const ManagerAppInner: React.FC = () => {
   const {
     bizId,
-    setBizId,
     loggedInManager,
     branchId,
     allowedPages,
@@ -78,7 +77,6 @@ const ManagerAppInner: React.FC = () => {
     authError: contextAuthError
   } = useManagerAuth();
 
-  const [bizInput, setBizInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -117,55 +115,7 @@ const ManagerAppInner: React.FC = () => {
     }
   }, [allowedPages]);
 
-  // 1. Kitchen Connect Screen
-  if (!bizId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white flex items-center justify-center p-4">
-        <div className="glass-card bg-white/10 backdrop-blur-xl p-6 sm:p-8 rounded-3xl max-w-md w-full border border-white/20 text-center space-y-5 shadow-2xl">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto shadow-inner">
-            <UserCheck size={32} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold font-display tracking-tight text-white">Branch Manager Portal</h2>
-            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Connect to your kitchen's business portal to manage customer subscriptions, fleet deliveries, and daily meal batches.
-            </p>
-          </div>
-
-          <div className="space-y-2 pt-1 text-left">
-            <label className="text-[11px] font-semibold text-slate-300">Kitchen / Business ID</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. Business ID or Slug"
-                value={bizInput}
-                onChange={(e) => setBizInput(e.target.value)}
-                className="flex-1 p-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-400"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const val = bizInput.trim();
-                    if (val) setBizId(val);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const val = bizInput.trim();
-                  if (val) setBizId(val);
-                }}
-                className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs rounded-xl transition-all shadow-md active:scale-95"
-              >
-                Connect
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Manager Login Screen
+  // Manager Login Screen
   if (!loggedInManager) {
     const handleLogin = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -176,7 +126,7 @@ const ManagerAppInner: React.FC = () => {
       }
       setSubmitting(true);
       try {
-        await login(emailInput.trim(), passwordInput, bizId);
+        await login(emailInput.trim(), passwordInput);
       } catch (err: any) {
         const msg = err?.message || 'Invalid email or password.';
         setLocalAuthError(msg);
@@ -192,16 +142,8 @@ const ManagerAppInner: React.FC = () => {
             <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto shadow-inner">
               <Lock size={26} />
             </div>
-            <h2 className="text-xl font-bold font-display tracking-tight text-white">{businessName}</h2>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-indigo-300 text-xs border border-white/10">
-              <span className="font-mono">{bizId}</span>
-              <button
-                onClick={() => setBizId('')}
-                className="text-slate-400 hover:text-white underline text-[10px] ml-1"
-              >
-                Change
-              </button>
-            </div>
+            <h2 className="text-xl font-bold font-display tracking-tight text-white">Manager Sign In</h2>
+            <p className="text-xs text-slate-300">Use the email and password provided by your kitchen owner.</p>
           </div>
 
           {displayAuthError && (
