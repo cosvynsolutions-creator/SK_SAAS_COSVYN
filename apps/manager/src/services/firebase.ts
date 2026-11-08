@@ -72,7 +72,7 @@ export const db: Firestore = (() => {
 })();
 
 // Initialize Functions on the isolated named app
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'asia-south1');
 
 // Server-verified manager login callable contract
 export interface ManagerLoginResponse {

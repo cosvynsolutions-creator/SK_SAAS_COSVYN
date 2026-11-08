@@ -4,12 +4,14 @@ const firestore = require('@google-cloud/firestore');
 const client = new firestore.v1.FirestoreAdminClient();
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
+setGlobalOptions({ region: "asia-south1" });
 
 // Define Secrets from Firebase Secret Manager (Phase 3)
 const razorpayKeySecret = defineSecret("RAZORPAY_KEY_SECRET");
@@ -143,7 +145,7 @@ exports.scheduledFirestoreExport = onSchedule(
  * Verifies driver email + password, enforces lockout (5 failures -> 15 min lock),
  * and issues a Firebase Custom Token with claims: { role: 'driver', bizId, staffId, branchId }
  */
-exports.driverLogin = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.driverLogin = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { email, password, bizId: reqBizId } = request.data || {};
 
   const cleanEmail = email ? String(email).trim().toLowerCase() : '';
@@ -211,7 +213,7 @@ exports.driverLogin = onCall({ cors: true, region: ['us-central1', 'asia-south1'
         resolvedBizId = driverDoc.bizId;
       }
     } else {
-      // Step B: Search within specified business or across collectionGroup('staff')
+      // Staff email lookup documents are provisioned with the driver's account.
       if (resolvedBizId) {
         const staffSnap = await db.collection('businesses')
           .doc(resolvedBizId)
@@ -222,24 +224,6 @@ exports.driverLogin = onCall({ cors: true, region: ['us-central1', 'asia-south1'
         if (!staffSnap.empty) {
           const docSnap = staffSnap.docs[0];
           driverDoc = { id: docSnap.id, staffId: docSnap.id, ...docSnap.data() };
-        }
-      } else {
-        const groupSnap = await db.collectionGroup('staff')
-          .where('email', '==', cleanEmail)
-          .limit(2)
-          .get();
-        if (!groupSnap.empty) {
-          if (groupSnap.size > 1) {
-            throw new HttpsError(
-              'failed-precondition',
-              'Multiple delivery accounts are associated with this email. Please contact your kitchen owner.'
-            );
-          }
-          const docSnap = groupSnap.docs[0];
-          driverDoc = { id: docSnap.id, staffId: docSnap.id, ...docSnap.data() };
-          if (docSnap.ref.parent && docSnap.ref.parent.parent) {
-            resolvedBizId = docSnap.ref.parent.parent.id;
-          }
         }
       }
     }
@@ -520,7 +504,7 @@ exports.managerLogin = onCall({ cors: true }, async (request) => {
  * Legacy export retained to avoid breaking older clients. PIN-based driver
  * authentication is retired; credentials must be managed with email/password.
  */
-exports.setDriverPin = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async () => {
+exports.setDriverPin = onCall({ cors: true, region: 'asia-south1' }, async () => {
   throw new HttpsError(
     'failed-precondition',
     'PIN-based delivery login is retired. Configure an email and password for this delivery partner.'
@@ -560,7 +544,7 @@ function verifyStaffManagementAuth(request, bizId, branchId) {
  * creates driver_profiles/{authUid} for client profile access,
  * and records hashed password in server-only staff_credentials collection.
  */
-exports.createDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.createDeliveryBoyAccount = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { 
     bizId, 
     email, 
@@ -753,7 +737,7 @@ exports.createDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 
  * updateDeliveryBoyAccount
  * Updates a delivery partner's profile and credentials.
  */
-exports.updateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.updateDeliveryBoyAccount = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { 
     bizId, 
     staffId,
@@ -997,7 +981,7 @@ exports.updateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 
  * resetDeliveryBoyPassword
  * Resets the password of a delivery partner in Firebase Auth and updates staff_credentials.
  */
-exports.resetDeliveryBoyPassword = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.resetDeliveryBoyPassword = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { bizId, staffId, newPassword } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1063,7 +1047,7 @@ exports.resetDeliveryBoyPassword = onCall({ cors: true, region: ['us-central1', 
  * deactivateDeliveryBoyAccount
  * Deactivates a delivery partner account: sets status to Inactive and disables Auth user.
  */
-exports.deactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.deactivateDeliveryBoyAccount = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { bizId, staffId } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1115,7 +1099,7 @@ exports.deactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central
  * reactivateDeliveryBoyAccount
  * Reactivates a delivery partner account: sets status to Active and enables Auth user.
  */
-exports.reactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.reactivateDeliveryBoyAccount = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { bizId, staffId } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1167,7 +1151,7 @@ exports.reactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central
 /**
  * setDriverPassword (backwards compatibility wrapper)
  */
-exports.setDriverPassword = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.setDriverPassword = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   const { staffId } = request.data || {};
   if (staffId) {
     return exports.updateDeliveryBoyAccount(request);
@@ -1225,7 +1209,7 @@ exports.setManagerPassword = onCall({ cors: true }, async (request) => {
  * Admin or Owner callable that removes legacy driver PIN credentials and migrates
  * manager plaintext passwords to passwordHash.
  */
-exports.migratePlaintextCredentials = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
+exports.migratePlaintextCredentials = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }

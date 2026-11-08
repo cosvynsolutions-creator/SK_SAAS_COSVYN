@@ -55,7 +55,7 @@ export const db = (() => {
   }
 })();
 
-export const functions = getFunctions(app, "us-central1");
+export const functions = getFunctions(app, "asia-south1");
 
 // Cloud Function Callables
 export const verifyAdminAuthCallable = httpsCallable<{ forceMint?: boolean }, { authorized: boolean; uid: string; email: string; admin: boolean; claimUpdated: boolean }>(functions, "verifyAdminAuth");

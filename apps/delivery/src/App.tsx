@@ -959,7 +959,7 @@ export const App: React.FC = () => {
           });
           if (['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded', 'functions/not-found'].includes(functionError?.code)) {
             throw new Error(
-              `Delivery authentication service error (${functionError.code}; Firebase Auth ${authError?.code || 'unknown'}). Confirm driverLogin is deployed to us-central1 and check Firebase Functions logs. ${functionError.message || ''}`
+              `Delivery authentication service error (${functionError.code}; Firebase Auth ${authError?.code || 'unknown'}). Confirm driverLogin is deployed to asia-south1 and check Firebase Functions logs. ${functionError.message || ''}`
             );
           }
           throw functionError;

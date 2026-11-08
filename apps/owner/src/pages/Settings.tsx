@@ -759,7 +759,7 @@ const Settings = () => {
         const detail = err?.message || 'No additional error detail was returned.';
         setModalError(
           code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded'
-            ? `Could not save the login (${code}). Confirm the Cloud Functions are deployed to us-central1, then check Firebase Functions logs. Details: ${detail}`
+            ? `Could not save the login (${code}). Confirm the Cloud Functions are deployed to asia-south1, then check Firebase Functions logs. Details: ${detail}`
             : `Could not save delivery partner (${code}). ${detail}`
         );
       } finally {

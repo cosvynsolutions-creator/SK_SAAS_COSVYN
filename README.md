@@ -34,15 +34,24 @@ screen as a PWA. Rider passwords are managed by Firebase Authentication, not
 stored as readable Firestore fields. Legacy PIN data can be removed from Owner
 Portal > Settings > Delivery Staff after deploying the updated Functions.
 
-The Firebase Functions page must contain the delivery account/login functions
-in `asia-south1` (Mumbai), matching this project's Firestore database region; a Vercel frontend build does not deploy Functions. Enable
-Firebase Authentication email/password sign-in, authorize the rider
-production hostname, and deploy both services from the repository root:
+All Firebase Functions and app clients use `asia-south1` (Mumbai), matching
+this project's Firestore database region; a Vercel frontend build does not
+deploy Functions. Enable Firebase Authentication email/password sign-in and
+authorize the rider production hostname.
 
 ```powershell
+firebase deploy --only firestore:indexes --project subbussinesssaas
 firebase deploy --only functions --project subbussinesssaas
 firebase deploy --only firestore:rules --project subbussinesssaas
 ```
+
+For the first regional migration, if Firebase asks whether to delete old
+`us-central1` functions, answer **No** until the Owner, Delivery, Manager, and
+Admin frontend deployments have all switched to `asia-south1`. Then deploy
+Functions again and approve deleting the old regional instances. Confirm
+`firebase functions:list --project subbussinesssaas` shows only `asia-south1`.
+If Razorpay webhooks are configured, update their URL to
+`https://asia-south1-subbussinesssaas.cloudfunctions.net/razorpayWebhook`.
 
 Use the complete [`firestore.rules`](./firestore.rules) file in this repository
 as the rules source of truth. See the [Delivery Partner setup and

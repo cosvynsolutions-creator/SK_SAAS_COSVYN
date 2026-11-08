@@ -13,13 +13,23 @@ show `driverLogin`, `createDeliveryBoyAccount`, and
 owner credential changes can work.
 
 From the repository root, after installing the Firebase CLI and signing in to
-the correct Google account:
+the correct Google account, deploy the collection-group indexes before the
+Functions that query them:
 
 ```powershell
-firebase deploy --only functions:driverLogin,functions:createDeliveryBoyAccount,functions:updateDeliveryBoyAccount,functions:resetDeliveryBoyPassword,functions:deactivateDeliveryBoyAccount,functions:reactivateDeliveryBoyAccount,functions:setDriverPassword,functions:setDriverPin,functions:migratePlaintextCredentials --project subbussinesssaas
+firebase deploy --only firestore:indexes --project subbussinesssaas
+firebase deploy --only functions --project subbussinesssaas
 firebase deploy --only firestore:rules --project subbussinesssaas
 firebase functions:list --project subbussinesssaas
 ```
+
+The Functions deployment moves every endpoint, including scheduled jobs and
+the Razorpay webhook, into `asia-south1`. During the frontend rollout, keep the
+old `us-central1` functions if Firebase asks whether to delete them. Deploy the
+Owner, Delivery, Manager, and Admin frontends, then deploy Functions again and
+approve deletion of the old regional functions. If Razorpay webhooks are
+configured, update their URL to
+`https://asia-south1-subbussinesssaas.cloudfunctions.net/razorpayWebhook`.
 
 Cloud Functions deployment requires the project to meet Firebase's billing and
 API prerequisites. Do not replace Firestore rules with permissive test rules:
@@ -65,6 +75,9 @@ that kitchen. That operation does not change email/password accounts.
   `createDeliveryBoyAccount` / `updateDeliveryBoyAccount` are deployed in
   `asia-south1`; then inspect their Functions logs. The dialog intentionally
   stays open when the server does not confirm the save.
+- **Owner save or fallback login shows a Firestore `FAILED_PRECONDITION`:**
+  deploy `firestore.indexes.json` with the command above and wait for the
+  `staff` and `managers` collection-group email indexes to finish building.
 - **Invalid credential / Auth 400:** confirm Email/Password is enabled, the
   owner saved a password for this rider, and the production host is an
   authorized domain. Firebase Auth passwords cannot be recovered from
