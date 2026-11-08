@@ -879,7 +879,7 @@ exports.updateDeliveryBoyAccount = onCall({ cors: true, region: 'asia-south1' },
   if (existingStaff.email && cleanEmail && existingStaff.email !== cleanEmail) {
     const oldLookupRef = db.collection('driver_auth_lookup_email').doc(existingStaff.email);
     const oldLookupSnap = await oldLookupRef.get();
-    if (oldLookupSnap.exists()) {
+    if (oldLookupSnap.exists) {
       const oldLookup = oldLookupSnap.data();
       if (oldLookup.bizId === bizId && oldLookup.staffId === staffId) {
         await oldLookupRef.delete();
