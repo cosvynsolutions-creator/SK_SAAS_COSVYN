@@ -43,7 +43,7 @@ export const googleProvider = new GoogleAuthProvider();
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 // Initialize Firebase Functions for secure server-side callables
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, "us-central1");
 
 // Callable function instances
 export const driverLoginCallable = httpsCallable<
@@ -55,11 +55,6 @@ export const managerLoginCallable = httpsCallable<
   { email: string; password: string; bizId?: string },
   { token: string; manager: { id: string; name: string; email: string; branchId: string; allowedPages: string[]; bizId: string } }
 >(functions, 'managerLogin');
-
-export const setDriverPinCallable = httpsCallable<
-  { bizId: string; staffId?: string; phone: string; pin: string; name?: string; branchId?: string; additionalData?: any },
-  { success: boolean; staffId: string }
->(functions, 'setDriverPin');
 
 export interface CreateDeliveryBoyAccountPayload {
   bizId: string;
@@ -99,12 +94,12 @@ export interface UpdateDeliveryBoyAccountPayload {
 export const createDeliveryBoyAccountCallable = httpsCallable<
   CreateDeliveryBoyAccountPayload,
   { success: boolean; staffId: string; authUid: string }
->(functions, 'createDeliveryBoyAccount');
+>(functions, 'createDeliveryBoyAccount', { timeout: 30000 });
 
 export const updateDeliveryBoyAccountCallable = httpsCallable<
   UpdateDeliveryBoyAccountPayload,
   { success: boolean; staffId: string; authUid?: string }
->(functions, 'updateDeliveryBoyAccount');
+>(functions, 'updateDeliveryBoyAccount', { timeout: 30000 });
 
 export const resetDeliveryBoyPasswordCallable = httpsCallable<
   { bizId: string; staffId: string; newPassword: string },

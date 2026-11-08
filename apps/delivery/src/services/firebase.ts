@@ -84,7 +84,7 @@ export const db: Firestore = (() => {
 })();
 
 // Initialize Functions on the isolated named app
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'us-central1');
 
 // Server-verified driver login callable contract
 export interface DriverLoginResponse {
@@ -102,7 +102,7 @@ export interface DriverLoginResponse {
 export const driverLoginCallable = httpsCallable<
   { email: string; password: string; bizId?: string },
   DriverLoginResponse
->(functions, 'driverLogin');
+>(functions, 'driverLogin', { timeout: 30000 });
 
 // Helper to inspect custom token claims for tenant isolation
 export interface DriverClaims {

@@ -20,7 +20,8 @@ import {
   reactivateDeliveryBoyAccountCallable, 
   setDriverPasswordCallable, 
   setManagerPasswordCallable, 
-  deleteDriverCallable 
+  deleteDriverCallable,
+  migrateCredentialsCallable
 } from '../services/firebase';
 import { doc, onSnapshot, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { VegNonVegBadge, VegNonVegIcon, DayDietScheduleSelector } from '../components/VegNonVegIndicator';
@@ -118,6 +119,7 @@ const Settings = () => {
   const [isSavingBrand, setIsSavingBrand] = useState(false);
   const [brandSavedSuccess, setBrandSavedSuccess] = useState(false);
   const [logoInputMethod, setLogoInputMethod] = useState<'url' | 'upload'>('url');
+  const [isCleaningLegacyDriverPins, setIsCleaningLegacyDriverPins] = useState(false);
 
   // Sub-tabs for staff section: 'managers' or 'logs'
   const [managerTab, setManagerTab] = useState<'list' | 'logs'>('list');
@@ -258,7 +260,7 @@ const Settings = () => {
   };
 
   const handleSaveStaff = async (data: Omit<DeliveryBoy, 'id'>) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error('Your owner session has expired. Sign in again and retry.');
     const cleanPhone = (data.mobile || '').replace(/\D/g, '').slice(-10);
     const cleanEmail = (data.email || '').trim().toLowerCase();
     const rawPassword = (data.password || '').trim();
@@ -321,6 +323,27 @@ const Settings = () => {
 
     setActiveModal(null);
     setEditingItem(null);
+  };
+
+  const handleCleanLegacyDriverPins = async () => {
+    if (!currentUser || isCleaningLegacyDriverPins) return;
+    const confirmed = window.confirm(
+      'Remove legacy PINs and PIN hashes for delivery partners in this kitchen? Email/password accounts will not be changed.'
+    );
+    if (!confirmed) return;
+
+    setIsCleaningLegacyDriverPins(true);
+    try {
+      const result = await migrateCredentialsCallable({});
+      window.alert(
+        `Legacy credential cleanup finished. Removed PIN fields from ${result.data.migratedStaffCount} delivery partner record(s).`
+      );
+    } catch (error: any) {
+      console.error('Legacy delivery PIN cleanup failed:', error);
+      window.alert(`Could not clean legacy PIN data (${error?.code || 'unknown error'}). Check Firebase Functions logs.`);
+    } finally {
+      setIsCleaningLegacyDriverPins(false);
+    }
   };
 
   const handleSaveManager = async (data: Omit<BranchManager, 'id'>) => {
@@ -732,7 +755,14 @@ const Settings = () => {
           status: formData.status || 'Active'
         } as any);
       } catch (err: any) {
-        setModalError(err?.message || 'Failed to save delivery partner account.');
+        const code = err?.code || 'unknown';
+        const detail = err?.message || 'No additional error detail was returned.';
+        setModalError(
+          code === 'functions/internal' || code === 'functions/unavailable' || code === 'functions/deadline-exceeded'
+            ? `Could not save the login (${code}). Confirm the Cloud Functions are deployed to us-central1, then check Firebase Functions logs. Details: ${detail}`
+            : `Could not save delivery partner (${code}). ${detail}`
+        );
+      } finally {
         setIsSubmitting(false);
       }
     };
@@ -1914,13 +1944,24 @@ const Settings = () => {
               <p className="text-[11px] text-slate-400">Riders and partners receiving WhatsApp route dispatches with optional Aadhar & home address</p>
             </div>
           </div>
-          <button 
-            onClick={() => handleOpenModal('delivery')} 
-            disabled={branches.length === 0} 
-            className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 transition-all shadow-sm active:scale-95"
-          >
-            <Plus size={15}/> Add Partner
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleCleanLegacyDriverPins()}
+              disabled={isCleaningLegacyDriverPins}
+              className="flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 transition-all"
+              title="Remove PIN fields left by the retired PIN login"
+            >
+              {isCleaningLegacyDriverPins ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+              Clean legacy PINs
+            </button>
+            <button
+              onClick={() => handleOpenModal('delivery')}
+              disabled={branches.length === 0}
+              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 transition-all shadow-sm active:scale-95"
+            >
+              <Plus size={15}/> Add Partner
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">

@@ -30,7 +30,24 @@ storage identity, PIN login, or a demo route.
 
 If a rider forgets their password, the kitchen owner must reset it in the Owner
 Portal. The app is designed for phone use and supports adding it to the home
-screen as a PWA.
+screen as a PWA. Rider passwords are managed by Firebase Authentication, not
+stored as readable Firestore fields. Legacy PIN data can be removed from Owner
+Portal > Settings > Delivery Staff after deploying the updated Functions.
+
+The Firebase Functions page must contain the delivery account/login functions
+in `us-central1`; a Vercel frontend build does not deploy Functions. Enable
+Firebase Authentication email/password sign-in, authorize the rider
+production hostname, and deploy both services from the repository root:
+
+```powershell
+firebase deploy --only functions --project subbussinesssaas
+firebase deploy --only firestore:rules --project subbussinesssaas
+```
+
+Use the complete [`firestore.rules`](./firestore.rules) file in this repository
+as the rules source of truth. See the [Delivery Partner setup and
+troubleshooting guide](./apps/delivery/README.md) for deployment checks and
+where to find detailed logs.
 
 ### Delivery partner manual verification
 

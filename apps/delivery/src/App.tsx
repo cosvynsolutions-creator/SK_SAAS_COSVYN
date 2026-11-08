@@ -944,10 +944,26 @@ export const App: React.FC = () => {
       let userCredential;
       try {
         userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-      } catch {
-        const result = await driverLoginCallable({ email: cleanEmail, password: cleanPassword });
-        if (!result.data?.token) throw new Error('The delivery login service did not return an authentication token.');
-        userCredential = await signInWithCustomToken(auth, result.data.token);
+      } catch (authError: any) {
+        console.error('Firebase email/password sign-in failed; trying the driverLogin fallback:', authError);
+        try {
+          const result = await driverLoginCallable({ email: cleanEmail, password: cleanPassword });
+          if (!result.data?.token) throw new Error('The driverLogin function returned no authentication token.');
+          userCredential = await signInWithCustomToken(auth, result.data.token);
+        } catch (functionError: any) {
+          console.error('driverLogin fallback failed:', {
+            authCode: authError?.code || 'unknown',
+            authMessage: authError?.message || '',
+            functionCode: functionError?.code || 'unknown',
+            functionMessage: functionError?.message || ''
+          });
+          if (['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded', 'functions/not-found'].includes(functionError?.code)) {
+            throw new Error(
+              `Delivery authentication service error (${functionError.code}; Firebase Auth ${authError?.code || 'unknown'}). Confirm driverLogin is deployed to us-central1 and check Firebase Functions logs. ${functionError.message || ''}`
+            );
+          }
+          throw functionError;
+        }
       }
 
       const claims = await getDriverClaims(userCredential.user);

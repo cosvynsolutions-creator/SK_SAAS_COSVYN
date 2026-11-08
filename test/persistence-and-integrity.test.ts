@@ -243,61 +243,13 @@ describe('ScaleKitchen Database Persistence & Data Integrity Tests', () => {
     });
   });
 
-  describe('6. Driver Independent Authentication & Phone Sanitization (Issue 2)', () => {
+  describe('6. Driver Contact Data & Account Status', () => {
     it('should normalize driver mobile numbers to 10-digit lookup keys', () => {
       expect(normalizePhone('+91 8309995962')).toBe('8309995962');
       expect(normalizePhone('08309995962')).toBe('8309995962');
       expect(normalizePhone('83099 95962')).toBe('8309995962');
       expect(normalizePhone('91-8309995962')).toBe('8309995962');
       expect(normalizePhone('+918309995962')).toBe('8309995962');
-    });
-
-    it('should reject invalid PIN formats', () => {
-      const isValidPin = (pin: string) => /^\d{4}$/.test(pin.trim());
-      expect(isValidPin('1234')).toBe(true);
-      expect(isValidPin('0000')).toBe(true);
-      expect(isValidPin('9876')).toBe(true);
-      expect(isValidPin('123')).toBe(false);
-      expect(isValidPin('12345')).toBe(false);
-      expect(isValidPin('12a4')).toBe(false);
-      expect(isValidPin('')).toBe(false);
-    });
-
-    it('should correctly encode and decode driver tokens with rider mobile and name while keeping PIN secure', async () => {
-      const { encodeDriverToken, decodeDriverToken } = await import('../apps/owner/src/services/store');
-      const bizId = 'biz_kitchen_xyz';
-      const staffId = 'staff_rider_456';
-      const mobile = '+91 8309995962';
-      const name = 'Abhi';
-
-      const token = encodeDriverToken(bizId, staffId, mobile, '1234', name);
-      expect(typeof token).toBe('string');
-      expect(token.length).toBeGreaterThan(10);
-
-      const decoded = decodeDriverToken(token);
-      expect(decoded).not.toBeNull();
-      expect(decoded?.bizId).toBe(bizId);
-      expect(decoded?.boyId).toBe(staffId);
-      expect(decoded?.mobile).toBe('8309995962');
-      expect(decoded?.name).toBe('Abhi');
-      // PIN MUST NOT be contained in the token
-      expect(decoded?.pin).toBeUndefined();
-    });
-
-    it('should securely hash PINs with bcrypt and verify matches while rejecting wrong PINs (Test 4)', async () => {
-      const bcrypt = (await import('bcryptjs')).default;
-      const originalPin = '1234';
-      const hashedPin = bcrypt.hashSync(originalPin, 10);
-
-      expect(hashedPin).not.toBe(originalPin);
-      expect(hashedPin.startsWith('$2')).toBe(true);
-
-      // Correct PIN matches
-      expect(bcrypt.compareSync('1234', hashedPin)).toBe(true);
-      // Incorrect PIN fails safely
-      expect(bcrypt.compareSync('0000', hashedPin)).toBe(false);
-      expect(bcrypt.compareSync('4321', hashedPin)).toBe(false);
-      expect(bcrypt.compareSync('', hashedPin)).toBe(false);
     });
 
     it('should reject deactivated driver accounts (Test 10)', () => {
@@ -312,20 +264,6 @@ describe('ScaleKitchen Database Persistence & Data Integrity Tests', () => {
       expect(isDriverActive({ active: false, status: 'Online' })).toBe(false);
       expect(isDriverActive({ isDeleted: true })).toBe(false);
       expect(isDriverActive({ status: 'Inactive' })).toBe(false);
-    });
-
-    it('should ensure session storage tokens do not contain plaintext PINs (Test 9)', () => {
-      const generateSessionToken = (phone: string, staffId: string) => {
-        return btoa(`${phone}:${staffId}:${Date.now()}`);
-      };
-
-      const token = generateSessionToken('8309995962', 'staff_123');
-      const decoded = atob(token);
-
-      expect(decoded).toContain('8309995962');
-      expect(decoded).toContain('staff_123');
-      // Must not contain any 4-digit PIN
-      expect(decoded).not.toContain('1234');
     });
   });
 

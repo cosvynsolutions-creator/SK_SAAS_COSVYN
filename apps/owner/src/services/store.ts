@@ -164,7 +164,6 @@ export interface DeliveryBoyStaff {
   homeLocation?: string;
   salary?: number;
   dateOfJoining?: string;
-  pin?: string; // 4-digit security PIN for driver portal login
 }
 
 // Fix: Added missing Expense types used in Expenses.tsx
@@ -879,71 +878,6 @@ export const INITIAL_BUSINESS_PROFILE: BusinessProfile = {
 };
 
 /**
- * Encodes driver access parameters into an obfuscated, URL-safe secure token.
- * SECURITY (Phase 1): Tokens NEVER contain PIN or phone credentials.
- * Contains only business ID and staff ID for routing. Drivers must authenticate with their PIN.
- */
-export const encodeDriverToken = (
-  bizId: string, 
-  boyId?: string, 
-  mobile?: string,
-  _pin?: string,
-  name?: string
-): string => {
-  if (!bizId) return '';
-  try {
-    const payload = {
-      b: bizId,
-      s: boyId || '',
-      m: mobile ? mobile.replace(/\D/g, '').slice(-10) : '',
-      n: name || '',
-      t: Date.now()
-    };
-    const json = JSON.stringify(payload);
-    return btoa(encodeURIComponent(json))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-  } catch {
-    return '';
-  }
-};
-
-/**
- * Decodes a secure driver token into connection parameters.
- * SECURITY: Never extracts or yields a PIN from tokens. PIN is verified separately.
- */
-export const decodeDriverToken = (token: string): { 
-  bizId: string; 
-  boyId?: string; 
-  mobile?: string;
-  pin?: string;
-  name?: string;
-} | null => {
-  if (!token) return null;
-  try {
-    let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) {
-      base64 += '=';
-    }
-    const json = decodeURIComponent(atob(base64));
-    const parsed = JSON.parse(json);
-    if (parsed && parsed.b) {
-      return {
-        bizId: parsed.b,
-        boyId: parsed.s || undefined,
-        mobile: parsed.m || undefined,
-        pin: undefined,
-        name: parsed.n || undefined
-      };
-    }
-  } catch (e) {
-    console.warn("Could not decode driver token:", e);
-  }
-  return null;
-};
-
-/**
  * UNIFIED CANONICAL CALCULATOR FOR CUSTOMER PLAN EXPIRATION & DAYS LEFT.
  * Used by Customer List, Notifications, Delivery Dashboard, and WhatsApp alerts
  * to guarantee 100% zero-discrepancy data consistency across the entire SaaS.
@@ -1043,4 +977,3 @@ export const getDefaultMealSessionForTime = (dateInput?: Date | string | number)
   }
   return 'Dinner';
 };
-
