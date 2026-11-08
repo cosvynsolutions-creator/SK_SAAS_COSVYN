@@ -366,9 +366,10 @@ export const getCustomerScheduledPlansForSession = (
   if (!customer) return [];
   if (customer.isActive === false) return [];
 
-  // If customer has activePlans array, use it; otherwise synthesize from flat customer properties
-  const plansList = Array.isArray(customer.activePlans) && customer.activePlans.length > 0 
-    ? customer.activePlans 
+  // An explicitly empty activePlans array means there is no current subscription.
+  // Synthesize a plan from flat fields only for legacy records without that array.
+  const plansList = Array.isArray(customer.activePlans)
+    ? customer.activePlans
     : (customer.planId || customer.planName ? [{
         planId: customer.planId,
         planName: customer.planName || 'Standard Meal',

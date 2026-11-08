@@ -299,8 +299,8 @@ export const getCustomerScheduledPlansForSession = (
   if (!customer) return [];
   if (customer.isActive === false) return [];
 
-  const plansList = Array.isArray(customer.activePlans) && customer.activePlans.length > 0 
-    ? customer.activePlans 
+  const plansList = Array.isArray(customer.activePlans)
+    ? customer.activePlans
     : (customer.planId || customer.planName ? [{
         planId: customer.planId,
         planName: customer.planName || 'Standard Meal',
@@ -322,6 +322,35 @@ export const getCustomerScheduledPlansForSession = (
     }
     const pConfig = plansConfig.find((p: any) => p.id === ap.planId);
     return isPlanActiveOnDate(ap, targetDateStr, pConfig, customer);
+  });
+};
+
+export const getDriverCustomersScheduledForSession = (
+  customers: GlobalCustomer[],
+  staffId: string,
+  branchId: string,
+  mealTime: MealSession,
+  targetDateStr: string,
+  plansConfig: any[] = []
+): Array<{ customer: GlobalCustomer; plans: SubscribedPlan[] }> => {
+  if (!staffId || !branchId || !targetDateStr) return [];
+
+  return customers.flatMap(customer => {
+    if (
+      customer.isActive === false ||
+      String(customer.deliveryBoyId || '') !== staffId ||
+      String(customer.branchId || '') !== branchId
+    ) {
+      return [];
+    }
+
+    const scheduledPlans = getCustomerScheduledPlansForSession(
+      customer,
+      mealTime,
+      targetDateStr,
+      plansConfig
+    );
+    return scheduledPlans.length > 0 ? [{ customer, plans: scheduledPlans }] : [];
   });
 };
 
@@ -436,9 +465,16 @@ export const isCustomerDeliveryDay2Plus = (customer: GlobalCustomer, targetDateS
   return false;
 };
 
-export const getTodayStr = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+export const getTodayStr = (now: Date = new Date()): string => {
+  const dateParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    dateParts.find(datePart => datePart.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 };
 
 export const normalizePhone = (phone: string): string => {
@@ -455,7 +491,11 @@ export const normalizePhone = (phone: string): string => {
  */
 export const getDefaultMealSessionForTime = (dateInput?: Date | string | number): MealSession => {
   const d = dateInput ? new Date(dateInput) : new Date();
-  const hours = d.getHours();
+  const hours = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    hourCycle: 'h23'
+  }).format(d));
   if (hours < 11) {
     return 'Breakfast';
   }

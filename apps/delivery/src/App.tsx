@@ -13,10 +13,10 @@ import {
   auth, db, driverLoginCallable, getDriverClaims,
   signInWithCustomToken, signInWithEmailAndPassword, signOut, onAuthStateChanged 
 } from './services/firebase';
-import { 
+import {
   getTodayStr, isCustomerDeliveryDay2Plus, REUSABLE_BOX_TYPES, 
   BoxRecollectionStatus, DeliveryBoyStaff, GlobalCustomer, SubscribedPlan,
-  getCustomerScheduledPlansForSession, isPlanActiveOnDate, formatDateDDMMYYYY,
+  getDriverCustomersScheduledForSession, formatDateDDMMYYYY,
   isReusableBoxType,
   getDefaultMealSessionForTime, MealSession, getPlanDietOnDate, DietType
 } from './services/driverStore';
@@ -36,9 +36,12 @@ export const App: React.FC = () => {
   const [authInitializing, setAuthInitializing] = useState<boolean>(true);
   const [selectedMeal, setSelectedMeal] = useState<MealSession>(() => getDefaultMealSessionForTime());
   const [isDriverMealManuallySelected, setIsDriverMealManuallySelected] = useState<boolean>(false);
+  const [todayStr, setTodayStr] = useState<string>(getTodayStr);
 
   useEffect(() => {
     const checkTime = () => {
+      const currentIndiaDate = getTodayStr();
+      setTodayStr(previous => previous === currentIndiaDate ? previous : currentIndiaDate);
       if (!isDriverMealManuallySelected) {
         const expected = getDefaultMealSessionForTime();
         setSelectedMeal(prev => (prev !== expected ? expected : prev));
@@ -61,7 +64,6 @@ export const App: React.FC = () => {
     ? 'Cannot load route. Check your connection and try again.'
     : null;
 
-  const todayStr = getTodayStr();
   const [isShiftActive, setIsShiftActive] = useState<boolean>(false);
   const [punchInTime, setPunchInTime] = useState<string | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -115,6 +117,11 @@ export const App: React.FC = () => {
           setLoginError('This account is not authorized as a delivery partner. Please use the email and password provided by your kitchen owner.');
           return;
         }
+        if (!claims.branchId) {
+          await signOut(auth);
+          setLoginError('Your delivery account has no assigned branch. Please contact your kitchen owner.');
+          return;
+        }
 
         const profileSnap = await getDoc(doc(db, 'driver_profiles', user.uid));
         if (profileSnap.exists() && profileSnap.data().active === false) {
@@ -125,7 +132,7 @@ export const App: React.FC = () => {
 
         setBizId(claims.bizId);
         setSelectedBoyId(claims.staffId);
-        setDriverBranchId(claims.branchId || '');
+        setDriverBranchId(claims.branchId);
         setDriverDisplayName(user.displayName || '');
         setLoginError(null);
         setLoginModalOpen(false);
@@ -178,9 +185,11 @@ export const App: React.FC = () => {
     );
 
     const customersRef = collection(db, 'businesses', bizId, 'customers');
-    const customerRoute = driverBranchId
-      ? query(customersRef, where('branchId', '==', driverBranchId))
-      : customersRef;
+    const customerRoute = query(
+      customersRef,
+      where('branchId', '==', driverBranchId),
+      where('deliveryBoyId', '==', selectedBoyId)
+    );
     const unsubscribeCust = onSnapshot(
       customerRoute,
       (snap) => {
@@ -212,7 +221,14 @@ export const App: React.FC = () => {
         const map: Record<string, any> = {};
         snap.docs.forEach(d => {
           const data = d.data();
-          if (data.date === todayStr) map[`${data.customerId}_${data.mealTime}`] = { id: d.id, ...data };
+          if (
+            data.date === todayStr &&
+            data.deliveryBoyId === selectedBoyId &&
+            data.staffId === selectedBoyId &&
+            data.branchId === driverBranchId
+          ) {
+            map[`${data.customerId}_${data.mealTime}`] = { id: d.id, ...data };
+          }
         });
         setDeliveryLogs(map);
       },
@@ -229,20 +245,6 @@ export const App: React.FC = () => {
         }
       },
       error => onRouteError('business', error)
-    );
-    const unsubscribeManifest = onSnapshot(
-      doc(db, 'businesses', bizId, 'driver_manifest', selectedBoyId),
-      (snap) => {
-        onRouteSuccess('manifest');
-        if (!snap.exists()) return;
-        const data = snap.data();
-        if (Array.isArray(data.customers)) setCustomers(data.customers);
-        if (Array.isArray(data.plans)) setPlans(data.plans);
-        if (Array.isArray(data.branches)) setBranches(data.branches);
-        if (data.businessName) setBusinessName(data.businessName);
-        if (data.logoUrl) setLogoUrl(data.logoUrl);
-      },
-      error => onRouteError('manifest', error)
     );
     const unsubscribeStatus = onSnapshot(
       doc(db, 'businesses', bizId, 'driver_status', selectedBoyId),
@@ -264,7 +266,6 @@ export const App: React.FC = () => {
       unsubscribeBranches();
       unsubscribeLogs();
       unsubscribeBiz();
-      unsubscribeManifest();
       unsubscribeStatus();
     };
   }, [bizId, selectedBoyId, driverBranchId, todayStr]);
@@ -392,28 +393,21 @@ export const App: React.FC = () => {
   }, [currentBoy, branches]);
 
   // Quick helper to determine if a customer is assigned to this driver
-  const isCustomerAssignedToRider = (c: any) => {
-    const assignedToDriver = selectedBoyId && String(c.deliveryBoyId || '') === selectedBoyId;
-    const assignedToBranch = !driverBranchId || !c.branchId || c.branchId === driverBranchId;
-    return Boolean(assignedToDriver && assignedToBranch);
-  };
-
   // Stop counts for each meal session
   const sessionStopCounts = useMemo(() => {
     const counts = { Breakfast: 0, Lunch: 0, Dinner: 0 };
     (['Breakfast', 'Lunch', 'Dinner'] as const).forEach(meal => {
-      const activeForMeal = customers.filter(c => {
-        if (c.isActive === false) return false;
-        if (!isCustomerAssignedToRider(c)) return false;
-        const plansList = getCustomerScheduledPlansForSession(c, meal, todayStr, plans);
-        if (plansList.length > 0) return true;
-        const cMeal = Array.isArray(c.mealTime) ? c.mealTime : [c.mealTime || 'Lunch'];
-        return cMeal.includes(meal) || cMeal.includes('All') || (meal === 'Lunch' && !c.mealTime);
-      });
-      counts[meal] = activeForMeal.length;
+      counts[meal] = getDriverCustomersScheduledForSession(
+        customers,
+        selectedBoyId,
+        driverBranchId,
+        meal,
+        todayStr,
+        plans
+      ).length;
     });
     return counts;
-  }, [customers, selectedBoyId, currentBoy, driverDisplayName, todayStr, plans]);
+  }, [customers, selectedBoyId, driverBranchId, todayStr, plans]);
 
   // Auto-switch to meal session with scheduled deliveries if current session has 0
   useEffect(() => {
@@ -431,31 +425,21 @@ export const App: React.FC = () => {
 
   // Stops assigned to this delivery boy for the selected meal session
   const stops = useMemo(() => {
-    if (!selectedBoyId && !driverDisplayName) return [];
-
     const activeCustomerStops: any[] = [];
 
-    customers
-      .filter(c => c.isActive !== false && isCustomerAssignedToRider(c))
-      .forEach(c => {
-        const rawPlans = getCustomerScheduledPlansForSession(c, selectedMeal, todayStr, plans);
+    getDriverCustomersScheduledForSession(
+      customers,
+      selectedBoyId,
+      driverBranchId,
+      selectedMeal,
+      todayStr,
+      plans
+    ).forEach(({ customer: c, plans: rawPlans }) => {
         let scheduledPlans = rawPlans.map(ap => ({
           ...ap,
           planConfig: plans.find(p => p.id === ap.planId),
           quantity: Number(ap.quantity) || 1
         }));
-
-        if (scheduledPlans.length === 0) {
-          const cMeal = Array.isArray(c.mealTime) ? c.mealTime : [c.mealTime || 'Lunch'];
-          if (cMeal.includes(selectedMeal) || cMeal.includes('All') || (selectedMeal === 'Lunch' && !c.mealTime)) {
-            scheduledPlans = [{
-              planId: c.planId || 'std-1',
-              planName: c.planName || 'Standard Meal Plan',
-              quantity: 1,
-              mealTime: selectedMeal
-            } as any];
-          }
-        }
 
         if (scheduledPlans.length > 0) {
           const stopTotalBoxes = scheduledPlans.reduce((sum: number, p: any) => sum + (p.quantity || 1), 0);
@@ -517,7 +501,7 @@ export const App: React.FC = () => {
       });
 
     return activeCustomerStops.sort((a, b) => a.routeOrder - b.routeOrder);
-  }, [customers, selectedBoyId, currentBoy, driverDisplayName, selectedMeal, plans, todayStr, deliveryLogs]);
+  }, [customers, selectedBoyId, driverBranchId, selectedMeal, plans, todayStr, deliveryLogs]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
@@ -970,6 +954,10 @@ export const App: React.FC = () => {
       if (claims?.role !== 'driver' || !claims.bizId || !claims.staffId) {
         await signOut(auth);
         throw new Error('This account is not authorized as a delivery partner. Please use the email and password provided by your kitchen owner.');
+      }
+      if (!claims.branchId) {
+        await signOut(auth);
+        throw new Error('Your delivery account has no assigned branch. Please contact your kitchen owner.');
       }
       const profileSnap = await getDoc(doc(db, 'driver_profiles', userCredential.user.uid));
       if (profileSnap.exists() && profileSnap.data().active === false) {

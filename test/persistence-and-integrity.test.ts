@@ -5,6 +5,7 @@ import {
   getCustomerActiveDaysLeft,
   formatDateDDMMYYYY,
   getDefaultMealSessionForTime,
+  getCustomerScheduledPlansForSession,
   normalizePhone,
   GlobalCustomer,
   GlobalPlan,
@@ -174,6 +175,20 @@ describe('ScaleKitchen Database Persistence & Data Integrity Tests', () => {
   });
 
   describe('4. Date and Pause Calculation Precision', () => {
+    it('should not treat flat legacy plan fields as active when activePlans is explicitly empty', () => {
+      const customer = {
+        isActive: true,
+        activePlans: [],
+        planId: 'old-plan',
+        planName: 'Old Lunch Plan',
+        mealTime: ['Lunch'],
+        startDate: '2026-11-01',
+        endDate: '2026-11-30'
+      };
+
+      expect(getCustomerScheduledPlansForSession(customer, 'Lunch', '2026-11-09')).toEqual([]);
+    });
+
     it('should push end date forward by the exact number of paused delivery days', () => {
       const weekdays = [1, 2, 3, 4, 5, 6]; // Mon to Sat (6 days/week)
       const startDate = '2026-11-02'; // Monday

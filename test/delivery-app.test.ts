@@ -7,6 +7,7 @@ import {
   normalizeWeekday, 
   isPlanActiveOnDate, 
   getCustomerScheduledPlansForSession, 
+  getDriverCustomersScheduledForSession,
   isCustomerDeliveryDay2Plus, 
   getTodayStr, 
   normalizePhone,
@@ -194,6 +195,75 @@ describe('ScaleKitchen Delivery App — Phase 3 Test Suite', () => {
       const dinnerPlans = getCustomerScheduledPlansForSession(customer, 'Dinner', '2026-10-11');
       expect(dinnerPlans.length).toBe(1);
       expect(dinnerPlans[0].planName).toBe('Dinner Box');
+    });
+
+    it('should include only this driver’s branch customers with plans scheduled on the selected date', () => {
+      const makeCustomer = (id: string, deliveryBoyId: string, branchId: string) => ({
+        id,
+        name: id,
+        mobile: '9876543210',
+        address: 'Bangalore',
+        area: 'Bangalore',
+        createdAt: '2026-11-01',
+        branchId,
+        deliveryBoyId,
+        isActive: true,
+        planId: 'p-lunch',
+        mealTime: ['Lunch'],
+        startDate: '2026-11-01',
+        endDate: '2026-11-30',
+        daysLeft: 20,
+        paymentStatus: 'Paid' as const,
+        amountPaid: 3000,
+        planPrice: 3000,
+        deliveryCharges: 0,
+        pendingAmount: 0,
+        renewalCount: 0,
+        routeOrder: 1
+      } as GlobalCustomer);
+      const assigned = makeCustomer('assigned', 'driver-1', 'branch-1');
+      const customers = [
+        assigned,
+        makeCustomer('other-driver', 'driver-2', 'branch-1'),
+        makeCustomer('other-branch', 'driver-1', 'branch-2')
+      ];
+
+      expect(getDriverCustomersScheduledForSession(
+        customers, 'driver-1', 'branch-1', 'Lunch', '2026-11-08'
+      )).toEqual([]);
+      expect(getDriverCustomersScheduledForSession(
+        customers, 'driver-1', 'branch-1', 'Lunch', '2026-11-09'
+      )).toEqual([{ customer: assigned, plans: expect.any(Array) }]);
+      expect(getDriverCustomersScheduledForSession(
+        customers, 'driver-1', '', 'Lunch', '2026-11-09'
+      )).toEqual([]);
+    });
+
+    it('should not resurrect a flat legacy plan when activePlans is explicitly empty', () => {
+      const customer = {
+        id: 'expired',
+        isActive: true,
+        branchId: 'branch-1',
+        deliveryBoyId: 'driver-1',
+        activePlans: [],
+        planId: 'old-plan',
+        planName: 'Old Lunch Plan',
+        mealTime: ['Lunch'],
+        startDate: '2026-11-01',
+        endDate: '2026-11-30'
+      } as GlobalCustomer;
+
+      expect(getCustomerScheduledPlansForSession(customer, 'Lunch', '2026-11-09')).toEqual([]);
+      expect(getDriverCustomersScheduledForSession(
+        [customer], 'driver-1', 'branch-1', 'Lunch', '2026-11-09'
+      )).toEqual([]);
+    });
+
+    it('should use the India calendar date and meal time at UTC day boundaries', () => {
+      const justAfterMidnightInIndia = new Date('2026-11-07T19:00:00.000Z');
+      expect(getTodayStr(justAfterMidnightInIndia)).toBe('2026-11-08');
+      expect(getDefaultMealSessionForTime(new Date('2026-11-08T04:30:00.000Z'))).toBe('Breakfast');
+      expect(getDefaultMealSessionForTime(new Date('2026-11-08T06:00:00.000Z'))).toBe('Lunch');
     });
   });
 
