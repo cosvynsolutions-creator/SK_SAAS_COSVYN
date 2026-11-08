@@ -20,7 +20,7 @@ ScaleKitchen Branch Manager Operational Portal — Independent frontend applicat
 - **Profile Verification:** After sign-in or session restore, the app verifies the manager profile UID, email, active status, and branch assignment against Firebase Auth and verified claims.
 - **Branch Scoping:** When `branchId !== 'All'`, operational hooks (`useStreamCollection`) and UI views constrain queries to the manager's assigned branch; Firestore rules enforce tenant and branch access.
 - **Granular Permissions:** Granted modules are controlled via `allowedPages` (e.g. `['dashboard', 'prep', 'deliveries', 'customers']`). Unassigned modules render an explicit `Permission Restricted` card.
-- **No custom-token sign-in:** The Manager app signs in with Firebase email/password; it does not need the Service Account Token Creator role. The retained `managerLogin` endpoint is disabled and only returns a migration error. Deploying account-provisioning Functions still requires Cloud Build's build service account to have its required build permissions; that is separate from Manager sign-in.
+- **Firebase email/password sign-in:** The Manager app uses the email and password configured by the owner. The owner-only callable creates the Firebase Authentication account and assigns claims; the Owner app saves the manager profile using its normal authenticated Firestore access. The old `managerLogin` endpoint remains disabled for older clients.
 - **Existing manager migration:** Edit and save each existing manager in Owner Settings. If the profile has no linked Firebase Auth UID, set a new password so `setManagerPassword` can create the Firebase Authentication account and securely link it to the existing profile.
 
 ## Available Workspace Scripts

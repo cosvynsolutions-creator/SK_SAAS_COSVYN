@@ -24,7 +24,7 @@ import {
   deleteDriverCallable,
   migrateCredentialsCallable
 } from '../services/firebase';
-import { doc, onSnapshot, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, deleteField, doc, onSnapshot, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { VegNonVegBadge, VegNonVegIcon, DayDietScheduleSelector } from '../components/VegNonVegIndicator';
 import { getPlanDietSummaryLabel, DietType, PlanDietPreference } from '../services/store';
 
@@ -342,25 +342,51 @@ const Settings = () => {
     if (!currentUser) throw new Error('Your owner session has expired. Sign in again and retry.');
     const { password, ...managerFields } = data;
     const cleanPassword = password?.trim() || '';
+    const managerId = editingItem?.id ||
+      doc(collection(db, 'businesses', currentUser.uid, 'managers')).id;
+    const status = managerFields.status || editingItem?.status || 'Active';
+    const active = managerFields.active ?? editingItem?.active ??
+      !['inactive', 'deactivated', 'disabled'].includes(status.toLowerCase());
+    const nowIso = new Date().toISOString();
+    const managerData = {
+      ...managerFields,
+      email: managerFields.email.trim().toLowerCase(),
+      status: active ? 'Active' : 'Inactive',
+      active,
+      createdAt: managerFields.createdAt || editingItem?.createdAt || nowIso
+    };
 
-    let result;
-    if (editingItem?.id) {
-      result = await setManagerPasswordCallable({
-        bizId: currentUser.uid,
-        managerId: editingItem.id,
-        password: cleanPassword,
-        managerData: managerFields
-      });
-    } else {
-      if (!cleanPassword) throw new Error('A password is required for a new manager account.');
-      result = await setManagerPasswordCallable({
-        bizId: currentUser.uid,
-        password: cleanPassword,
-        managerData: {
-          ...managerFields,
-          createdAt: new Date().toISOString()
-        }
-      });
+    const result = await setManagerPasswordCallable({
+      bizId: currentUser.uid,
+      managerId,
+      authUid: editingItem?.authUid,
+      password: cleanPassword,
+      managerData
+    });
+
+    const profileRef = doc(db, 'businesses', currentUser.uid, 'managers', managerId);
+    const profile = Object.fromEntries(
+      Object.entries({
+        ...managerData,
+        id: managerId,
+        authUid: result.data.authUid,
+        updatedAt: nowIso
+      }).filter(([, value]) => value !== undefined)
+    );
+    try {
+      await setDoc(profileRef, {
+        ...profile,
+        password: deleteField(),
+        passwordHash: deleteField()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Manager Firebase account was provisioned, but the profile write failed:', error);
+      const code = typeof error === 'object' && error && 'code' in error
+        ? String(error.code)
+        : 'unknown';
+      throw new Error(
+        `Firebase sign-in was set up, but the manager profile could not be saved (${code}). Confirm you are signed in as this business owner, then retry saving.`
+      );
     }
 
     if (result.data.warning) window.alert(result.data.warning);
@@ -409,10 +435,17 @@ const Settings = () => {
     if(!currentUser || !window.confirm("Are you sure? This cannot be undone.")) return;
     if (collection === 'managers') {
       try {
-        await deleteManagerAccountCallable({ bizId: currentUser.uid, managerId: id });
+        const manager = managers.find(item => item.id === id);
+        await deleteManagerAccountCallable({
+          bizId: currentUser.uid,
+          managerId: id,
+          authUid: manager?.authUid,
+          email: manager?.email
+        });
+        await deleteDoc(doc(db, 'businesses', currentUser.uid, 'managers', id));
       } catch (error) {
         console.error('Could not delete manager account:', error);
-        window.alert('Could not delete manager account. Check your connection and Firebase Functions logs, then retry.');
+        window.alert('Could not delete manager account. Confirm your owner session and internet connection, then retry.');
       }
       return;
     }

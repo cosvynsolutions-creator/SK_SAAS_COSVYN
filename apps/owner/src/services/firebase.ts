@@ -117,7 +117,7 @@ export const setDriverPasswordCallable = httpsCallable<
 >(functions, 'setDriverPassword');
 
 export const setManagerPasswordCallable = httpsCallable<
-  { bizId: string; managerId?: string; password: string; managerData: ManagerAccountData },
+  { bizId: string; managerId: string; authUid?: string; password: string; managerData: ManagerAccountData },
   { success: boolean; managerId: string; authUid: string; warning?: string }
 >(functions, 'setManagerPassword');
 
@@ -132,11 +132,13 @@ export interface ManagerAccountData {
   salary?: number;
   dateOfJoining?: string;
   homeLocation?: string;
+  status?: string;
+  active?: boolean;
   createdAt?: string;
 }
 
 export const deleteManagerAccountCallable = httpsCallable<
-  { bizId: string; managerId: string },
+  { bizId: string; managerId: string; authUid?: string; email?: string },
   { success: boolean }
 >(functions, 'deleteManagerAccount');
 

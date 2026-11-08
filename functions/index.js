@@ -986,59 +986,48 @@ exports.setDriverPassword = onCall({ cors: true, region: 'asia-south1' }, async 
 
 /**
  * setManagerPassword
- * Owner-only provisioning for Firebase Authentication manager accounts.
- * Sets verified manager claims and stores the non-secret profile in Firestore.
+ * Owner-only Firebase Authentication provisioning for manager accounts.
+ * The owner client persists the profile through the owner Firestore rules.
  */
 exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required to set manager password.');
   }
 
-  const { bizId, managerId, password, managerData = {} } = request.data || {};
-
+  const { bizId, managerId, authUid: linkedAuthUid, password, managerData = {} } = request.data || {};
   const callerUid = request.auth.uid;
-  const isOwner = callerUid === bizId;
   const isAdmin = request.auth.token?.admin === true ||
     (request.auth.token?.email_verified === true &&
       ['cosvynsolutions@gmail.com', 'admin@scalekitchen.in', 'memosmy10@gmail.com']
         .includes(String(request.auth.token.email || '').toLowerCase()));
 
-  if (!isOwner && !isAdmin) {
-    throw new HttpsError('permission-denied', 'Only the kitchen owner can set manager passwords.');
-  }
-  if (!bizId || typeof bizId !== 'string') {
+  if (typeof bizId !== 'string' || !bizId.trim()) {
     throw new HttpsError('invalid-argument', 'A valid business ID is required.');
   }
+  if (callerUid !== bizId && !isAdmin) {
+    throw new HttpsError('permission-denied', 'Only the kitchen owner can set manager passwords.');
+  }
+  if (typeof managerId !== 'string' || !managerId.trim() || managerId.includes('/')) {
+    throw new HttpsError('invalid-argument', 'A valid manager profile ID is required.');
+  }
 
+  const targetManagerId = managerId.trim();
   const cleanPassword = String(password || '');
   if (cleanPassword && cleanPassword.length < 6) {
     throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
   }
-
-  const db = admin.firestore();
-  const managersRef = db.collection('businesses').doc(bizId).collection('managers');
-  const targetManagerId = managerId || managersRef.doc().id;
-  const managerRef = managersRef.doc(targetManagerId);
-  const oldManagerSnap = managerId ? await managerRef.get() : null;
-
-  if (managerId && !oldManagerSnap.exists) {
-    throw new HttpsError('not-found', 'Manager account was not found.');
+  if (!managerData || typeof managerData !== 'object' || Array.isArray(managerData)) {
+    throw new HttpsError('invalid-argument', 'Manager profile data is invalid.');
   }
 
-  const oldManager = oldManagerSnap?.data() || {};
-  const email = String(managerData.email || oldManager.email || '').trim().toLowerCase();
-  const name = String(managerData.name || oldManager.name || '').trim();
-  const branchId = String(managerData.branchId || oldManager.branchId || 'All').trim();
+  const email = String(managerData.email || '').trim().toLowerCase();
+  const name = String(managerData.name || '').trim();
+  const branchId = String(managerData.branchId || 'All').trim();
   const allowedPages = Array.isArray(managerData.allowedPages)
     ? [...new Set(managerData.allowedPages.filter((page) => typeof page === 'string'))]
-    : Array.isArray(oldManager.allowedPages)
-      ? oldManager.allowedPages
-      : ['dashboard'];
-  const status = String(managerData.status || oldManager.status || 'Active');
-  const active = managerData.active === undefined
-    ? status.toLowerCase() !== 'inactive' && oldManager.active !== false
-    : managerData.active !== false;
-  const isActive = active && status.toLowerCase() !== 'inactive' &&
+    : ['dashboard'];
+  const status = String(managerData.status || 'Active');
+  const isActive = managerData.active !== false && status.toLowerCase() !== 'inactive' &&
     status.toLowerCase() !== 'deactivated' && status.toLowerCase() !== 'disabled';
 
   if (!email || !email.includes('@')) {
@@ -1050,26 +1039,19 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
   if (!branchId) {
     throw new HttpsError('invalid-argument', 'A manager branch assignment is required.');
   }
-  if (!cleanPassword && !managerId) {
+  if (!cleanPassword && !linkedAuthUid) {
     throw new HttpsError('invalid-argument', 'A password is required for a new manager account.');
-  }
-
-  const duplicateEmailSnap = await managersRef.where('email', '==', email).limit(10).get();
-  if (duplicateEmailSnap.docs.some((manager) => manager.id !== targetManagerId)) {
-    throw new HttpsError('already-exists', 'Another manager profile in this kitchen already uses this email.');
   }
 
   let authUser = null;
   let createdAuthUser = false;
-  if (oldManager.authUid) {
+  if (linkedAuthUid) {
     try {
-      authUser = await admin.auth().getUser(oldManager.authUid);
+      authUser = await admin.auth().getUser(linkedAuthUid);
     } catch (error) {
-      if (error.code === 'auth/user-not-found') {
-        authUser = null;
-      } else {
+      if (error.code !== 'auth/user-not-found') {
         console.error('[setManagerPassword] Could not load linked manager Auth user:', error);
-        throw new HttpsError('failed-precondition', 'The linked Firebase manager account could not be found. Set up a new manager profile or contact support.');
+        throw new HttpsError('internal', 'Could not verify the linked manager Firebase account.');
       }
     }
   }
@@ -1090,10 +1072,10 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
       claims.role === 'manager' &&
       claims.bizId === bizId &&
       claims.managerId === targetManagerId;
-    const isLinkedLegacyManager = oldManager.authUid === authUser.uid &&
+    const isLinkedLegacyManager = linkedAuthUid === authUser.uid &&
       claims.admin !== true &&
-      (!claims.role || isSameManager) &&
-      (!oldManager.email || String(authUser.email || '').toLowerCase() === String(oldManager.email).toLowerCase());
+      !claims.role &&
+      String(authUser.email || '').toLowerCase() === email;
     if (!isSameManager && !isLinkedLegacyManager) {
       throw new HttpsError('already-exists', 'This email already belongs to another Firebase account. Use a unique manager email.');
     }
@@ -1125,16 +1107,6 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
     throw new HttpsError('internal', 'Firebase Authentication did not return the manager account.');
   }
 
-  const allowedManagerFields = [
-    'name', 'mobile', 'aadharNumber', 'location', 'salary',
-    'dateOfJoining', 'homeLocation', 'createdAt'
-  ];
-  const profile = {};
-  for (const field of allowedManagerFields) {
-    if (managerData[field] !== undefined) profile[field] = managerData[field];
-    else if (oldManager[field] !== undefined) profile[field] = oldManager[field];
-  }
-  const nowIso = new Date().toISOString();
   const claims = {
     role: 'manager',
     bizId,
@@ -1151,30 +1123,15 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
       disabled: !isActive
     };
     if (cleanPassword) authUpdate.password = cleanPassword;
-    await admin.auth().updateUser(authUser.uid, authUpdate);
     await admin.auth().setCustomUserClaims(authUser.uid, claims);
-
-    await managerRef.set({
-      ...profile,
-      id: targetManagerId,
-      name,
-      email,
-      branchId,
-      allowedPages: claims.allowedPages,
-      authUid: authUser.uid,
-      active: isActive,
-      status: isActive ? 'Active' : 'Inactive',
-      updatedAt: nowIso,
-      password: admin.firestore.FieldValue.delete(),
-      passwordHash: admin.firestore.FieldValue.delete()
-    }, { merge: true });
+    await admin.auth().updateUser(authUser.uid, authUpdate);
   } catch (error) {
-    console.error('[setManagerPassword] Could not save manager Firebase account:', error);
+    console.error('[setManagerPassword] Could not provision manager Firebase Auth account:', error);
     if (createdAuthUser) {
       try {
         await admin.auth().deleteUser(authUser.uid);
       } catch (rollbackError) {
-        console.error('[setManagerPassword] Could not remove incomplete manager Auth account:', rollbackError);
+        console.error('[setManagerPassword] Could not remove incomplete Firebase Auth account:', rollbackError);
       }
     } else {
       try {
@@ -1191,7 +1148,7 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
     if (error.code === 'auth/email-already-exists') {
       throw new HttpsError('already-exists', 'This email already belongs to another Firebase account. Use a unique manager email.');
     }
-    throw new HttpsError('internal', `Could not save manager account (${error.code || 'internal'}). Check Cloud Functions logs.`);
+    throw new HttpsError('internal', `Could not provision manager Firebase credentials (${error.code || 'auth/error'}). Check Cloud Functions logs.`);
   }
 
   let warning;
@@ -1199,7 +1156,7 @@ exports.setManagerPassword = onCall({ cors: true, region: 'asia-south1' }, async
     await admin.auth().revokeRefreshTokens(authUser.uid);
   } catch (error) {
     console.error('[setManagerPassword] Manager saved, but active sessions could not be revoked:', error);
-    warning = 'Manager account was saved, but existing sessions could not be ended immediately. Ask the manager to sign out and back in.';
+    warning = 'Manager sign-in was updated, but existing sessions could not be ended immediately. Ask the manager to sign out and back in.';
   }
 
   return { success: true, managerId: targetManagerId, authUid: authUser.uid, warning };
@@ -1210,7 +1167,7 @@ exports.deleteManagerAccount = onCall({ cors: true, region: 'asia-south1' }, asy
     throw new HttpsError('unauthenticated', 'Authentication required to delete a manager account.');
   }
 
-  const { bizId, managerId } = request.data || {};
+  const { bizId, managerId, authUid, email } = request.data || {};
   const callerUid = request.auth.uid;
   const isAdmin = request.auth.token?.admin === true ||
     (request.auth.token?.email_verified === true &&
@@ -1219,41 +1176,35 @@ exports.deleteManagerAccount = onCall({ cors: true, region: 'asia-south1' }, asy
   if (!bizId || !managerId || (callerUid !== bizId && !isAdmin)) {
     throw new HttpsError('permission-denied', 'Only the kitchen owner can delete this manager account.');
   }
-
-  const db = admin.firestore();
-  const managerRef = db.collection('businesses').doc(bizId).collection('managers').doc(managerId);
-  const managerSnap = await managerRef.get();
-  if (!managerSnap.exists) {
-    throw new HttpsError('not-found', 'Manager account was not found.');
+  if (typeof managerId !== 'string' || !managerId.trim() || managerId.includes('/')) {
+    throw new HttpsError('invalid-argument', 'A valid manager profile ID is required.');
   }
 
-  const manager = managerSnap.data();
-  let authUid = manager.authUid;
-  if (!authUid) {
-    const legacyUid = `manager_${bizId}_${managerId}`;
+  let targetAuthUid = authUid;
+  if (!targetAuthUid && typeof email === 'string' && email.trim()) {
     try {
-      const legacyUser = await admin.auth().getUser(legacyUid);
-      const claims = legacyUser.customClaims || {};
-      if (claims.role === 'manager' && claims.bizId === bizId && claims.managerId === managerId) {
-        authUid = legacyUid;
-      }
+      const user = await admin.auth().getUserByEmail(email.trim().toLowerCase());
+      targetAuthUid = user.uid;
     } catch (error) {
       if (error.code !== 'auth/user-not-found') {
-        console.error('[deleteManagerAccount] Could not verify legacy manager Auth user:', error);
+        console.error('[deleteManagerAccount] Could not look up manager Firebase account:', error);
         throw new HttpsError('internal', 'Could not verify the manager Firebase account.');
       }
     }
   }
 
-  if (authUid) {
+  if (targetAuthUid) {
+    if (typeof targetAuthUid !== 'string') {
+      throw new HttpsError('invalid-argument', 'Manager Firebase account ID is invalid.');
+    }
     try {
-      const user = await admin.auth().getUser(authUid);
+      const user = await admin.auth().getUser(targetAuthUid);
       const claims = user.customClaims || {};
       if (claims.role !== 'manager' || claims.bizId !== bizId || claims.managerId !== managerId) {
         throw new HttpsError('failed-precondition', 'The linked Firebase account does not match this manager profile.');
       }
-      await admin.auth().revokeRefreshTokens(authUid);
-      await admin.auth().deleteUser(authUid);
+      await admin.auth().revokeRefreshTokens(targetAuthUid);
+      await admin.auth().deleteUser(targetAuthUid);
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       if (error.code !== 'auth/user-not-found') {
@@ -1263,7 +1214,6 @@ exports.deleteManagerAccount = onCall({ cors: true, region: 'asia-south1' }, asy
     }
   }
 
-  await managerRef.delete();
   return { success: true };
 });
 
