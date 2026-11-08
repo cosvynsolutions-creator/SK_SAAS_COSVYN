@@ -143,7 +143,7 @@ exports.scheduledFirestoreExport = onSchedule(
  * Verifies driver email + password, enforces lockout (5 failures -> 15 min lock),
  * and issues a Firebase Custom Token with claims: { role: 'driver', bizId, staffId, branchId }
  */
-exports.driverLogin = onCall({ cors: true }, async (request) => {
+exports.driverLogin = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { email, password, bizId: reqBizId } = request.data || {};
 
   const cleanEmail = email ? String(email).trim().toLowerCase() : '';
@@ -520,7 +520,7 @@ exports.managerLogin = onCall({ cors: true }, async (request) => {
  * Legacy export retained to avoid breaking older clients. PIN-based driver
  * authentication is retired; credentials must be managed with email/password.
  */
-exports.setDriverPin = onCall({ cors: true }, async () => {
+exports.setDriverPin = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async () => {
   throw new HttpsError(
     'failed-precondition',
     'PIN-based delivery login is retired. Configure an email and password for this delivery partner.'
@@ -560,7 +560,7 @@ function verifyStaffManagementAuth(request, bizId, branchId) {
  * creates driver_profiles/{authUid} for client profile access,
  * and records hashed password in server-only staff_credentials collection.
  */
-exports.createDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
+exports.createDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { 
     bizId, 
     email, 
@@ -753,7 +753,7 @@ exports.createDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
  * updateDeliveryBoyAccount
  * Updates a delivery partner's profile and credentials.
  */
-exports.updateDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
+exports.updateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { 
     bizId, 
     staffId,
@@ -997,7 +997,7 @@ exports.updateDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
  * resetDeliveryBoyPassword
  * Resets the password of a delivery partner in Firebase Auth and updates staff_credentials.
  */
-exports.resetDeliveryBoyPassword = onCall({ cors: true }, async (request) => {
+exports.resetDeliveryBoyPassword = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { bizId, staffId, newPassword } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1063,7 +1063,7 @@ exports.resetDeliveryBoyPassword = onCall({ cors: true }, async (request) => {
  * deactivateDeliveryBoyAccount
  * Deactivates a delivery partner account: sets status to Inactive and disables Auth user.
  */
-exports.deactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
+exports.deactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { bizId, staffId } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1115,7 +1115,7 @@ exports.deactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
  * reactivateDeliveryBoyAccount
  * Reactivates a delivery partner account: sets status to Active and enables Auth user.
  */
-exports.reactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) => {
+exports.reactivateDeliveryBoyAccount = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { bizId, staffId } = request.data || {};
 
   if (!bizId || !staffId) {
@@ -1167,7 +1167,7 @@ exports.reactivateDeliveryBoyAccount = onCall({ cors: true }, async (request) =>
 /**
  * setDriverPassword (backwards compatibility wrapper)
  */
-exports.setDriverPassword = onCall({ cors: true }, async (request) => {
+exports.setDriverPassword = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   const { staffId } = request.data || {};
   if (staffId) {
     return exports.updateDeliveryBoyAccount(request);
@@ -1225,7 +1225,7 @@ exports.setManagerPassword = onCall({ cors: true }, async (request) => {
  * Admin or Owner callable that removes legacy driver PIN credentials and migrates
  * manager plaintext passwords to passwordHash.
  */
-exports.migratePlaintextCredentials = onCall({ cors: true }, async (request) => {
+exports.migratePlaintextCredentials = onCall({ cors: true, region: ['us-central1', 'asia-south1'] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required.');
   }

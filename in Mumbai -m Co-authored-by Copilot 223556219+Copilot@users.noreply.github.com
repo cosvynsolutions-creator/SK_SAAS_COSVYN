@@ -1,0 +1,8 @@
+ README.md                              |  2 [32m+[m[31m-[m
+ apps/delivery/README.md                | 16 [32m++++++++[m[31m--------[m
+ apps/delivery/src/services/firebase.ts |  2 [32m+[m[31m-[m
+ apps/owner/src/services/firebase.ts    | 17 [32m+++++++++[m[31m--------[m
+ functions/index.js                     | 18 [32m+++++++++[m[31m---------[m
+ functions/package-lock.json            |  2 [32m+[m[31m-[m
+ functions/package.json                 |  2 [32m+[m[31m-[m
+ 7 files changed, 30 insertions(+), 29 deletions(-)

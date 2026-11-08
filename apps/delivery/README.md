@@ -9,14 +9,14 @@ account and route; the app does not use a phone/PIN login or URL identity.
 
 The frontend build does not deploy Firebase services. The Functions page must
 show `driverLogin`, `createDeliveryBoyAccount`, and
-`updateDeliveryBoyAccount` in the `us-central1` region before rider sign-in or
+`updateDeliveryBoyAccount` in the `asia-south1` (Mumbai) region before rider sign-in or
 owner credential changes can work.
 
 From the repository root, after installing the Firebase CLI and signing in to
 the correct Google account:
 
 ```powershell
-firebase deploy --only functions --project subbussinesssaas
+firebase deploy --only functions:driverLogin,functions:createDeliveryBoyAccount,functions:updateDeliveryBoyAccount,functions:resetDeliveryBoyPassword,functions:deactivateDeliveryBoyAccount,functions:reactivateDeliveryBoyAccount,functions:setDriverPassword,functions:setDriverPin,functions:migratePlaintextCredentials --project subbussinesssaas
 firebase deploy --only firestore:rules --project subbussinesssaas
 firebase functions:list --project subbussinesssaas
 ```
@@ -55,15 +55,15 @@ that kitchen. That operation does not change email/password accounts.
 
 ## Troubleshooting and logs
 
-- **Functions page is empty / login shows `functions/internal`:** deploy
-  Functions using the commands above. Then check Firebase Console → Functions
-  → Logs, or run:
+- **Login shows `functions/internal`:** deploy the rider functions using the
+  command above. Check that the callables are listed in `asia-south1`. Then
+  check Firebase Console → Functions → Logs, or run:
   ```powershell
   firebase functions:log --only driverLogin --project subbussinesssaas
   ```
 - **Owner save times out or shows `functions/unavailable`:** verify
   `createDeliveryBoyAccount` / `updateDeliveryBoyAccount` are deployed in
-  `us-central1`; then inspect their Functions logs. The dialog intentionally
+  `asia-south1`; then inspect their Functions logs. The dialog intentionally
   stays open when the server does not confirm the save.
 - **Invalid credential / Auth 400:** confirm Email/Password is enabled, the
   owner saved a password for this rider, and the production host is an
@@ -74,7 +74,7 @@ that kitchen. That operation does not change email/password accounts.
   Confirm the rider's staff record, active profile, branch assignment, and
   custom claims agree.
 - **CORS error in browser console:** confirm `driverLogin` is deployed to
-  `us-central1`. A missing/unavailable callable cannot be fixed by changing
+  `asia-south1`. A missing/unavailable callable cannot be fixed by changing
   rider credentials. If only the manifest request redirects to Vercel SSO,
   make the Vercel production deployment public.
 - **Detailed client logs:** connect Android Chrome to desktop Chrome using
@@ -91,5 +91,5 @@ that kitchen. That operation does not change email/password accounts.
 - `npm run build --workspace=@scalekitchen/delivery`
 
 The app uses the `ScaleKitchenDelivery` Firebase app instance and Functions in
-`us-central1`. Firestore uses persistent local cache when available; pending
+`asia-south1`, the same region as the production Firestore database. Firestore uses persistent local cache when available; pending
 writes synchronize after connectivity returns.

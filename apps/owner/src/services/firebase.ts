@@ -44,12 +44,13 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 
 // Initialize Firebase Functions for secure server-side callables
 export const functions = getFunctions(app, "us-central1");
+const deliveryFunctions = getFunctions(app, "asia-south1");
 
 // Callable function instances
 export const driverLoginCallable = httpsCallable<
   { email: string; password: string; bizId: string },
   { token: string; driver: { name: string; bizId: string; staffId: string; branchId: string; mobile: string } }
->(functions, 'driverLogin');
+>(deliveryFunctions, 'driverLogin');
 
 export const managerLoginCallable = httpsCallable<
   { email: string; password: string; bizId?: string },
@@ -94,32 +95,32 @@ export interface UpdateDeliveryBoyAccountPayload {
 export const createDeliveryBoyAccountCallable = httpsCallable<
   CreateDeliveryBoyAccountPayload,
   { success: boolean; staffId: string; authUid: string }
->(functions, 'createDeliveryBoyAccount', { timeout: 30000 });
+>(deliveryFunctions, 'createDeliveryBoyAccount', { timeout: 30000 });
 
 export const updateDeliveryBoyAccountCallable = httpsCallable<
   UpdateDeliveryBoyAccountPayload,
   { success: boolean; staffId: string; authUid?: string }
->(functions, 'updateDeliveryBoyAccount', { timeout: 30000 });
+>(deliveryFunctions, 'updateDeliveryBoyAccount', { timeout: 30000 });
 
 export const resetDeliveryBoyPasswordCallable = httpsCallable<
   { bizId: string; staffId: string; newPassword: string },
   { success: boolean }
->(functions, 'resetDeliveryBoyPassword');
+>(deliveryFunctions, 'resetDeliveryBoyPassword');
 
 export const deactivateDeliveryBoyAccountCallable = httpsCallable<
   { bizId: string; staffId: string },
   { success: boolean }
->(functions, 'deactivateDeliveryBoyAccount');
+>(deliveryFunctions, 'deactivateDeliveryBoyAccount');
 
 export const reactivateDeliveryBoyAccountCallable = httpsCallable<
   { bizId: string; staffId: string },
   { success: boolean }
->(functions, 'reactivateDeliveryBoyAccount');
+>(deliveryFunctions, 'reactivateDeliveryBoyAccount');
 
 export const setDriverPasswordCallable = httpsCallable<
   { bizId: string; staffId?: string; email: string; password: string; name?: string; branchId?: string; mobile?: string; vehicleNumber?: string; additionalData?: any },
   { success: boolean; staffId: string }
->(functions, 'setDriverPassword');
+>(deliveryFunctions, 'setDriverPassword');
 
 export const setManagerPasswordCallable = httpsCallable<
   { bizId: string; managerId?: string; password: string; managerData: any },
@@ -129,7 +130,7 @@ export const setManagerPasswordCallable = httpsCallable<
 export const migrateCredentialsCallable = httpsCallable<
   Record<string, never>,
   { success: boolean; migratedStaffCount: number; migratedManagersCount: number; migratedGlobalDriversCount: number }
->(functions, 'migratePlaintextCredentials');
+>(deliveryFunctions, 'migratePlaintextCredentials');
 
 export const migrateDriverManifestsCallable = httpsCallable<
   Record<string, never>,

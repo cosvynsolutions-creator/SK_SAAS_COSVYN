@@ -35,7 +35,7 @@ stored as readable Firestore fields. Legacy PIN data can be removed from Owner
 Portal > Settings > Delivery Staff after deploying the updated Functions.
 
 The Firebase Functions page must contain the delivery account/login functions
-in `us-central1`; a Vercel frontend build does not deploy Functions. Enable
+in `asia-south1` (Mumbai), matching this project's Firestore database region; a Vercel frontend build does not deploy Functions. Enable
 Firebase Authentication email/password sign-in, authorize the rider
 production hostname, and deploy both services from the repository root:
 

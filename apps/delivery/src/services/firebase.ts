@@ -84,7 +84,7 @@ export const db: Firestore = (() => {
 })();
 
 // Initialize Functions on the isolated named app
-export const functions = getFunctions(app, 'us-central1');
+export const functions = getFunctions(app, 'asia-south1');
 
 // Server-verified driver login callable contract
 export interface DriverLoginResponse {
